@@ -1,0 +1,2 @@
+# AMG
+Active Manifold-Geodesics
