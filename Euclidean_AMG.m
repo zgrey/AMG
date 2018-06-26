@@ -1,4 +1,4 @@
-%% Euclidean AMG demo script && convergence study
+%% Euclidean AMG demo script & convergence study
 % reference: Grey, Z.J., Constantine, P.G., "A Riemannian View on Active Subspaces", TBD
 close all; clearvars;
 rng(47);
@@ -6,7 +6,7 @@ rng(47);
 %% Things to modify
 % dimension of Euclidean space (m > 1)
 m = 10;
-% convergence study values (2.^NN and 2.^NT are amounts, Nu and Tu are upper bounds)
+% convergence study values (NN and NT are amounts, 2.^Nu and 2.^Tu are upper bounds)
 NN = 10; NT = 100; Nu = 10; Tu = 10;
 
 %% Convergence study
@@ -16,10 +16,11 @@ NN = 10; NT = 100; Nu = 10; Tu = 10;
 ang1 = 90*ones(NN*NT,1); dot1 = zeros(NN*NT,1); err = ones(NN*NT,1); ang2 = ang1;
 
 for i=1:NN*NT
+clc; fprintf('%0.2f%% complete...\n',i/(NN*NT)*100);
 % uniform random samples
 X = -1 + 2*rand(N(i),m);
 
-% various real scalar-valued maps and gradient, uncomment line of interest:
+%% Various real scalar-valued maps and gradient, uncomment line of interest:
 % oscillating ridge
 % a = 2*rand(m,1)-1; a = a/norm(a); F = sin(2*pi*X*a) + cos(pi/2*X*a); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)');
 % oscillating approximate ridge
@@ -28,11 +29,11 @@ a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); F = sum(sin(pi*X*a) + cos(pi/2
 % a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); F = sum(sin(pi*X*a) + cos(pi/2*X*a),2) + sum((sin(pi*X))*A(:,2:end),2); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)') + sum(pi*cos(pi*X)*A(:,2:end),2)/(m-1);
 % exponential ridge
 % a = 2*rand(m,1)-1; F = exp(X*a); Grad = repmat(a',N(i),1).*F;
-% quadratic non-ridge with increasing parameter importance and rank = m-1
+% quadratic non-ridge with increasing parameter importance and rank(C) = m-1
 % H = diag(linspace(0,1,m)); F = sum((X*H).*X,2); Grad = X*H;
-% linear-quadratic ridge of rank =  r <= m
+% linear-quadratic ridge of rank(C) =  r <= m
 % r = m; a = 2*rand(m,1)-1; H = [eye(r),zeros(r,m-r);zeros(m-r,m)]; F = sum((X*H).*X + X*a,2); Grad = X*H + repmat(a',N(i),1);
-% quadratic ridge of rank = r <= floor(m/2)
+% quadratic ridge of rank(C) = r <= floor(m/2)
 % r = 2; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); F = sum((X*H).*X,2); Grad = X*H;
 
 %% Euclidean Active Manifold-Geodesics approximation
@@ -74,13 +75,17 @@ fprintf('Last u_2 angle = %f deg.\n',ang2(end));
 dot1(dot1 <= 0) = eps;
 % compute subspace distance convergence rate
 M = [ones(NT*NN,1) log10(T) log10(N)]; cerr = M \ log10(err); cerr0 = [cerr(1); 2; 0.5];
-fprintf('Sub. dist. T convergence rate 10^%f\n',cerr(2));
-fprintf('Sub. dist. N convergence rate 10^%f\n',cerr(3));
+% coefficient of determination for convergence estimate
+Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
+fprintf('Sub. dist. T convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
+fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(3),Rsq);
 
 % compute first singular vector inner product convergennce rate
 cdot1 = M \ log10(dot1); cdot10 = [cdot1(1); 2; 0.5];
-fprintf('First eig. vec. T convergence rate 10^%f\n',cdot1(2));
-fprintf('First eig. vec. N convergence rate 10^%f\n',cdot1(3));
+% coefficient of determination for convergence estimate
+Rsq_dot1 = 1 - sum((log10(dot1) - M*cdot1).^2)/sum((log10(dot1) - mean(log10(dot1))).^2);
+fprintf('First eig. vec. T convergence rate 10^%f (R^2 = %f)\n',cdot1(2), Rsq_dot1);
+fprintf('First eig. vec. N convergence rate 10^%f (R^2 = %f)\n',cdot1(3), Rsq_dot1);
 
 %% Visualizations
 %% Visualizations of function
@@ -147,27 +152,30 @@ xlabel('i','interpreter','latex'); ylabel('$$\hat{u}^i_1 \, (Circles),\,\, \hat{
 %% Convergence of first singular vector
 if length(N) ~= 1
 % contour plot of linear fit to log10(dot1) for convergence rate estimates
-figure; contourf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*cdot1,NT,NN),15);
+figure; subplot(1,2,1), contourf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*cdot1,NT,NN),15);
 colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); hold on; axis equal;
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); title('$$\log_{10}(1-|\hat{w}_1^T\hat{u}_1|)$$','Interpreter','latex');
 % surface plot of log10(dot1) raw data
-figure; surf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape(log10(dot1),NT,NN));
+subplot(1,2,2), surf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape(log10(dot1),NT,NN));
 hold on; colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); shading interp; view([0,0,1]); axis([1,log10(max(N)),1,log10(max(T))]);
 % contour expected rates over raw data
-contour(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*[cdot1(1);2;0.5],NT,NN),15,'--','linecolor',0.25*ones(3,1));
-xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); title('$$\log_{10}(1-|\hat{w}_1^T\hat{u}_1|)$$','Interpreter','latex');
+subplot(1,2,2), contour(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*[cdot1(1);2;0.5],NT,NN),15,'--','linecolor',0.25*ones(3,1));
+xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(N)),max(log10(N)),min(log10(T)),max(log10(T))]);
+title('$$\log_{10}(1-|\hat{w}_1^T\hat{u}_1|)$$','Interpreter','latex');
 end
 
 %% Convergence of subspace distance
 if length(N) ~= 1
 % contour plot of linear fit to log10(err) for convergence rate estimates
-figure; contourf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*cerr,NT,NN),15);
-colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); hold on; axis equal;
-xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); title('$$\log_{10}\left(||\hat{W}\hat{W}^T - \hat{U}\hat{U}^T||_2\right)$$','Interpreter','latex');
+figure; subplot(1,2,1), contourf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*cerr,NT,NN),15);
+colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); hold on; axis square;
+xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex');
+title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 % surface plot of log10(err) raw data
-figure; surf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape(log10(err),NT,NN));
+subplot(1,2,2), surf(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape(log10(err),NT,NN));
 hold on; colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); shading interp; view([0,0,1]); axis([1,log10(max(N)),1,log10(max(T))]);
 % contour expected rates over raw data
-contour(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*[cerr(1);2;0.5],NT,NN),15,'--','linecolor',0.25*ones(3,1));
-xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); title('$$\log_{10}\left(||\hat{W}\hat{W}^T - \hat{U}\hat{U}^T||_2\right)$$','Interpreter','latex');
+subplot(1,2,2), contour(reshape(log10(N),NT,NN),reshape(log10(T),NT,NN),reshape([ones(NT*NN,1), log10(T), log10(N)]*[cerr(1);2;0.5],NT,NN),15,'--','linecolor',0.5*ones(3,1));
+xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(N)),max(log10(N)),min(log10(T)),max(log10(T))]);
+title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 end
