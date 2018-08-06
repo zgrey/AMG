@@ -22,9 +22,9 @@ X = -1 + 2*rand(N(i),m);
 
 %% Various real scalar-valued maps and gradient, uncomment line of interest:
 % oscillating ridge
-% a = 2*rand(m,1)-1; a = a/norm(a); F = sin(2*pi*X*a) + cos(pi/2*X*a); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)');
+a = 2*rand(m,1)-1; a = a/norm(a); F = sin(2*pi*X*a) + cos(pi/2*X*a); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)');
 % oscillating approximate ridge
-a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); F = sum(sin(pi*X*a) + cos(pi/2*X*a),2) + 0.1*sum((sin(pi*X))*A(:,2:end),2); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)') + 0.1*sum(pi*cos(pi*X)*A(:,2:end),2)/(m-1);
+% a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); F = sum(sin(pi*X*a) + cos(pi/2*X*a),2) + 0.1*sum((sin(pi*X))*A(:,2:end),2); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)') + 0.1*sum(pi*cos(pi*X)*A(:,2:end),2)/(m-1);
 % oscillating non-ridge
 % a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); F = sum(sin(pi*X*a) + cos(pi/2*X*a),2) + sum((sin(pi*X))*A(:,2:end),2); Grad = kron(sum(pi*cos(pi*X*a) - pi/2*sin(pi/2*X*a),2),sum(a,2)') + sum(pi*cos(pi*X)*A(:,2:end),2)/(m-1);
 % exponential ridge
