@@ -9,8 +9,8 @@ N = 500;
 % smaller neighborhood(s)
 % r = (0.75-0.25)*rand(N,1)+ 0.25; th = pi/4*rand(N,1);
 % r = (0.9-0.7)*rand(N,1)+ 0.7; th = pi/2*rand(N,1);
-r = 0.99*rand(N,1); th = pi/4*rand(N,1);
-% r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
+% r = 0.99*rand(N,1); th = pi/4*rand(N,1);
+r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
 
 % sample random ball in parametrization domain
 S = r.*[cos(th),sin(th)];
@@ -35,7 +35,7 @@ Exp = @(t,Vt,P) kron(P,cos(t)) + kron(Vt./sqrt(sum(Vt.^2,2)),sin(t));
 % compute exponentials along random tangent vectors
 k = 25; t = 0.5*linspace(-1,1,k)'; GG = reshape(Exp(t,Vt,P),k,N,3);
 % logarithmic map
-Log = @(p,P,vt) ( P - p )*([vt', cross(vt',p')]*( ([vt', cross(vt',p')]'*[vt', cross(vt',p')]) \ [vt', cross(vt',p')]' ))';
+Log = @(p,P) acos(P*p').*(P - P*p'.*repmat(p,size(P,1),1))./sqrt(sum((P - P*p'.*repmat(p,size(P,1),1)).^2,2));
 
 %% Ambient map on the sphere
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
@@ -59,7 +59,7 @@ surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting'
 % contour style mesh
 % mesh(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'EdgeColor','interp'); alpha(0.75);
 % no map, sphere only
-% mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; alpha(0); axis equal; %colormap gray;
+% mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; alpha(0); axis equal; colormap gray;
 color = caxis; hold on; axis equal; colorbar;
 % random points
 scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd,'MarkerEdgeColor','k','linewidth',1);
@@ -73,10 +73,10 @@ fig.CurrentAxes.Visible = 'off';
 
 %% Karcher mean & Visualization
 % initialize gradient descent optimization routine
-p0  = Exp(0,Vt(1,:),P(1,:)); Jp = [1 0; 0 1; Zx(p0(1),p0(2)) Zy(p0(1),p0(2))]; vt = rand(1,2)*Jp'; vt = vt/norm(vt); v = 1;
+p0  = Exp(0.01,Vt(1,:),P(1,:)); Jp = [1 0; 0 1; Zx(p0(1),p0(2)) Zy(p0(1),p0(2))]; vt = rand(1,2)*Jp'; vt = vt/norm(vt); v = 1;
 % Fletcher et al. (Algorithm 1)
 while norm(v) > 1e-6
-    v = 1/N*sum(Log(p0,P,vt),1);
+    v = 1/N*sum(Log(p0,P),1);
     
 %     scatter3(p0(1),p0(2),p0(3),35,'filled','b');
 %     quiver3(p0(1),p0(2),p0(3),v(1),v(2),v(3),1,'b','linewidth',2);
@@ -112,11 +112,11 @@ for i=1:N, GGset(:,i,:) = Exp(tt*Vg(i),Gt(i,:),P(i,:)); end
 % scatter3(reshape(Gset(:,:,1),k*N,1),reshape(Gset(:,:,2),k*N,1),reshape(Gset(:,:,3),k*N,1),'k')
 
 % logarithmic map of geodesic point set
-Vlog = Log(p0,reshape(Gset,k*N,3),vt);
+Vlog = Log(p0,reshape(Gset,k*N,3));
 % SVD of tangential coordinates for logarithmic map of geodesic point set
 [U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*Vlog',0); U = U'*[vt;vt2];
 % visualize log map vectors
-quiver3(repmat(p0(1),k*N,1),repmat(p0(2),k*N,1),repmat(p0(3),k*N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
+% quiver3(repmat(p0(1),k*N,1),repmat(p0(2),k*N,1),repmat(p0(3),k*N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
 quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),U(:,1),U(:,2),U(:,3),1,'r','linewidth',2);
 
@@ -127,7 +127,7 @@ plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'r--','linewidth',2);
 
 % compute & visualize AMG shadow plot
 % project logarithmic map of random points
-Gy = Log(p0,P,vt)*U';
+Gy = Log(p0,P)*U';
 % visualize first-singular projected geodesic points
 Py = Exp(Gy(:,1),U(1,:),p0);
 plot3(Py(:,1),Py(:,2),Py(:,3),'ro','linewidth',2);
