@@ -5,7 +5,7 @@ rng(47);
 
 %% Things to modify
 % dimension of Euclidean space (m > 1)
-m = 10;
+m = 2;
 % convergence study values (NN and NT are amounts, 2.^Nu and 2.^Tu are upper bounds)
 NN = 10; NT = 100; Nu = 10; Tu = 10;
 
@@ -102,8 +102,8 @@ gcf; title(['$$\theta_1 = ',num2str(ang1(end,end)),'$$ deg.'],'Interpreter','lat
 subplot(1,2,1), quiver(0,0,U1(1),U1(2),'r','linewidth',2); 
 subplot(1,2,1), quiver(0,0,U2(1),U2(2),'r--','linewidth',2);
 % plot active subspace basis
-subplot(1,2,1), quiver3(0,0,0,W1(1),W1(2),W1(3),'k--','linewidth',2); 
-subplot(1,2,1), quiver3(0,0,0,W2(1),W2(2),W2(3),'k--','linewidth',2);
+subplot(1,2,1), quiver(0,0,0,W1(1),W1(2),'k--','linewidth',2); 
+subplot(1,2,1), quiver(0,0,0,W2(1),W2(2),'k--','linewidth',2);
 % scatter AMG geodesic point set (function stencil)
 subplot(1,2,2), scatter(G(:,1),G(:,2),'k.');
 axis equal; fig = gcf; fig.CurrentAxes.Visible = 'off';
