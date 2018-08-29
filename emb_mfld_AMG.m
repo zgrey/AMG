@@ -5,19 +5,19 @@ clc; close all; clearvars; rng(47);
 % generate random values in parametrization domain
 N = 500;
 % entire upper hemisphere
-% r = 0.99*rand(N,1); th = 2*pi*rand(N,1);
+r = 0.99*rand(N,1); th = 2*pi*rand(N,1);
 % smaller neighborhood(s)
 % r = (0.75-0.25)*rand(N,1)+ 0.25; th = pi/4*rand(N,1);
 % r = (0.9-0.7)*rand(N,1)+ 0.7; th = pi/2*rand(N,1);
 % r = 0.99*rand(N,1); th = pi/4*rand(N,1);
-r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
+% r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
 
 % sample random ball in parametrization domain
 S = r.*[cos(th),sin(th)];
 % sample random directions
 V = 2*rand(N,2) - 1; V = V./sqrt(sum(V.^2,2));
 % mesh the entire sphere
-nmesh = 25; [XX,YY,ZZ] = sphere(nmesh);
+nmesh = 50; [XX,YY,ZZ] = sphere(nmesh);
 
 % parametrize upper hemisphere
 Zcurv = @(X,Y) sqrt(1-X.^2 - Y.^2); Z = Zcurv(S(:,1),S(:,2));
@@ -40,8 +40,12 @@ Log = @(p,P) acos(P*p').*(P - P*p'.*repmat(p,size(P,1),1))./sqrt(sum((P - P*p'.*
 %% Ambient map on the sphere
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
 
+% linear ambient function
+% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
+% quadratic ambient ridge of rank(H) = r <= floor(m/2)
+r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
 % highly nonlinear ridge
-a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
+% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
 % w = 0.1; a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); Func = @(XY) sum(sin(pi*XY*a) + cos(pi/2*XY*a),2) + w*sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)') + w*sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1); 
 % highly nonlinear non-ridge
@@ -54,8 +58,10 @@ Gt = Grnd - bsxfun(@times,sum(Grnd.*P,2),P);
 
 %% Visualize function on sphere
 fig = figure;
-% filled surface
-surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting','gouraud','EdgeAlpha',0.25); alpha(0.55);
+% simple filled surface
+surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting','gouraud','EdgeAlpha',0);
+% fancy filled surface
+% surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting','gouraud','EdgeAlpha',0.25); alpha(0.55);
 % contour style mesh
 % mesh(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'EdgeColor','interp'); alpha(0.75);
 % no map, sphere only
@@ -87,11 +93,13 @@ while norm(v) > 1e-6
 %     pause(0.5)
 end
 % visualize converged Karcher mean
-scatter3(p0(1),p0(2),p0(3),75,'r','filled','MarkerEdgeColor','k','linewidth',2);
+scatter3(p0(1),p0(2),p0(3),75,'k','filled','MarkerEdgeColor','k','linewidth',2);
+
 
 %% Active Manifold-Geodesics
 % known mean for upper hemisphere
 % p0 = [0,0,1]; vt = [rand(1,2),0]; vt = vt/norm(vt);
+% 
 % compute basis for tangent space (an orthogonal tangent vector)
 vt2 = cross(p0,vt); Ptan = [p0 + vt; p0 + vt2; p0 - vt; p0 - vt2; p0 + vt;];
 % visualize tangent space at mean
@@ -118,19 +126,30 @@ Vlog = Log(p0,reshape(Gset,k*N,3));
 % visualize log map vectors
 % quiver3(repmat(p0(1),k*N,1),repmat(p0(2),k*N,1),repmat(p0(3),k*N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
-quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),U(:,1),U(:,2),U(:,3),1,'r','linewidth',2);
+quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),U(:,1),U(:,2),U(:,3),1,'k','linewidth',2);
 
 % compute & visualize active manifold-geodesic
 AMG = Exp(2*tt,U(1,:),p0); IAMG = Exp(2*tt,U(2,:),p0);
-plot3(AMG(:,1),AMG(:,2),AMG(:,3),'r','linewidth',2);
-plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'r--','linewidth',2);
+plot3(AMG(:,1),AMG(:,2),AMG(:,3),'k','linewidth',2);
+plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'k--','linewidth',2);
 
 % compute & visualize AMG shadow plot
 % project logarithmic map of random points
 Gy = Log(p0,P)*U';
 % visualize first-singular projected geodesic points
 Py = Exp(Gy(:,1),U(1,:),p0);
-plot3(Py(:,1),Py(:,2),Py(:,3),'ro','linewidth',2);
+% plot3(Py(:,1),Py(:,2),Py(:,3),'ro','linewidth',2);
+
+%% AMG level-set optimizatoin:
+% find the point on the AMG that minimizes the function's variability over the IAMG
+options = optimset('TolX',eps,'TolFun',eps,'Display','on');
+obj = @(t) range(  Func( Exp(linspace(-10,10,500)',U(2,:),Exp(t,U(1,:),p0)) )  );
+[tAMG,obj_opt,exitflag] = fminsearch(obj,0,options);
+pAMG = Exp(tAMG,U(1,:),p0);
+% compute & visualize inactive active manifold-geodesic at tAMG
+IAMG = Exp(2*tt,U(2,:),pAMG);
+scatter3(pAMG(1),pAMG(2),pAMG(3),75,'filled','r');
+plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'r--','linewidth',2);
 
 %% Rotating geodesics (verification of AMG and IAMG)
 Nr = 25; tr = linspace(0,1,Nr)';
@@ -154,9 +173,11 @@ Grscl = 10;
 fig2 = figure; hold on;
 for i=1:size(R,1)/Nr*Nr, plot(tgr,Func(reshape(Gr(:,i,:),Ngr,3)),'-','Color',abs(1-Grscl^thr(i)/Grscl)*ones(3,1)); end
 % replot AMG sweep
-plot(tgr,Func(reshape(Gr(:,1,:),Ngr,3)),'k','linewidth',1);
+plot(tgr,Func(reshape(Gr(:,1,:),Ngr,3)),'k','linewidth',2);
 % replot IAMG sweep
-plot(tgr,Func(reshape(Gr(:,Nr,:),Ngr,3)),'k--','linewidth',1);
+plot(tgr,Func(reshape(Gr(:,Nr,:),Ngr,3)),'k--','linewidth',2);
 % scatter plot over inner products of Log projection
 scatter(Gy(:,1),Frnd,50,'filled','cdata',Frnd); caxis(color);
 ylabel 'f(Exp_x(t; v))'; xlabel 't'
+% plot AMG level-set optimizaton inactive geodesic response
+plot(tgr,Func(Exp(2*tgr,U(2,:),pAMG)),'r--','linewidth',2);
