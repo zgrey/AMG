@@ -3,14 +3,16 @@ clc; close all; clearvars; rng(47);
 
 %% Convergence study
 % convergence study values (NN and NT are amounts, 2.^Nu and 2.^Tu are upper bounds)
-NN = 14; NT = 1; Nu = 14; Tu = 0;
+NN = 13; NT = 1; Tu = 0; nboot = 10;
 % combinations of N and T for convergence study
-[Ni,Ti] = meshgrid(linspace(1,Nu,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(2.^Ti,NN*NT,1);
+[Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = 2*reshape(2.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
-err = ones(NN*NT,1);
+err = ones(NN*NT,nboot);
 
+for j = 1:nboot
 for i = 1:NN*NT
-clc; fprintf('%0.2f%% complete...\n',i/(NN*NT)*100);
+clc; fprintf('%0.2f%% complete...(%i / %i bootstrap)\n',i/(NN*NT)*100,j,nboot);
+rng(j)
 %% The sphere
 % generate random values in parametrization domain
 N = Ni(i);
@@ -19,7 +21,7 @@ N = Ni(i);
 % smaller neighborhoods
 % r = (0.75-0.25)*rand(N,1)+ 0.25; th = pi/4*rand(N,1);
 % r = (0.9-0.7)*rand(N,1)+ 0.7; th = pi/2*rand(N,1);
-% r = 0.99*rand(N,1); th = pi/4*rand(N,1);
+r = 0.99*rand(N,1); th = pi/4*rand(N,1);
 % r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
 
 % sample random ball in parametrization domain
@@ -85,22 +87,26 @@ vt2 = cross(p0,vt); Ptan = [p0 + vt; p0 + vt2; p0 - vt; p0 - vt2; p0 + vt;];
 k = 2; t = T*linspace(-1,1,k)'; Vg = sqrt(sum(Gt.^2,2)); Gset = zeros(k,N,3);
 for ii=1:N, Gset(:,ii,:) = Exp(t*Vg(ii),Gt(ii,:),P(ii,:)); end
 % refined geodesic samples (for visualization)
-kk = 25; tt = T*linspace(-1,1,kk)'; GGset = zeros(kk,N,3);
+kk = 50; tt = T*linspace(-1,1,kk)'; GGset = zeros(kk,N,3);
 for ii=1:N, GGset(:,ii,:) = Exp(tt*Vg(ii),Gt(ii,:),P(ii,:)); end
 
 % logarithmic map of geodesic point set
 Vlog = Log(p0,reshape(Gset,k*N,3));
+% Remove bias from PGA
+% logarithmic map of sampled point set
+Vlogx = Log(p0,P);
+[Ux,Dx,~] = svd(1/sqrt(N)*[vt;vt2]*Vlogx',0); Ux = Ux'*[vt;vt2];
 % SVD of tangential coordinates for logarithmic map of geodesic point set
-[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*Vlog',0); U = U'*[vt;vt2];
+[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog-repmat(Vlogx,2,1))',0); U = U'*[vt;vt2];
 
-% compute error w.r.t Mukerjee embedding definition
+% compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
 % subspace distance to the embedding definition
-err(i) = norm(W*W' - U(1,:)'*U(1,:),2);
+err(i,j) = norm(W*W' - U(1,:)'*U(1,:),2);
 
 % compute active and inactive manifold-geodesic
 AMG = Exp(2*tt,U(1,:),p0); IAMG = Exp(2*tt,U(2,:),p0);
-% compute embedding definition geodesic
+% compute Mukherjee embedding definition geodesic
 EmbG = Exp(2*tt,W',p0);
 
 % compute AMG shadow plot
@@ -133,18 +139,19 @@ Ngr = 100; Tr = 2*max([abs(max(Gy(:,1))),abs(min(Gy(:,1)))]); tgr = linspace(-Tr
 % exponential maps along rotated tangent vectors
 Gr = reshape(Exp(tgr,R,repmat(p0,size(R,1)/Nr*Nr,1)),Ngr,size(R,1)/Nr*Nr,3);
 end
+end
 if NT ~= 1
 % compute subspace distance convergence rate
-M = [ones(NT*NN,1) log10(Ti) log10(Ni)]; cerr = M \ log10(err);
+M = [ones(NT*NN,1) log10(Ti) log10(Ni)]; cerr = M \ log10(mean(err,2));
 % coefficient of determination for convergence estimate
-Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
+Rsq = 1 - sum((log10(mean(err,2)) - M*cerr).^2)/sum((log10(mean(err,2)) - mean(log10(mean(err,2)))).^2);
 fprintf('Sub. dist. T convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(3),Rsq);
 elseif NT == 1
 % compute subspace distance convergence rate
-M = [ones(NN,1) log10(Ni)]; cerr = M \ log10(err);
+M = [ones(NN,1) log10(Ni)]; cerr = M \ log10(mean(err,2));
 % coefficient of determination for convergence estimate
-Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
+Rsq = 1 - sum((log10(mean(err,2)) - M*cerr).^2)/sum((log10(mean(err,2)) - mean(log10(mean(err,2)))).^2);
 fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 end
 
@@ -161,7 +168,7 @@ surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting'
 % mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; alpha(0); axis equal; colormap gray;
 color = caxis; hold on; axis equal; colorbar;
 % random points
-% scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd,'MarkerEdgeColor','k','linewidth',1);
+scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd,'MarkerEdgeColor','k','linewidth',1);
 % random tangent vectors
 % quiver3(P(:,1),P(:,2),P(:,3),Vt(:,1),Vt(:,2),Vt(:,3),1,'k','linewidth',2)
 % exponential maps along random tangent vectors
@@ -188,8 +195,10 @@ plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',2)
 % quiver3(repmat(p0(1),k*N,1),repmat(p0(2),k*N,1),repmat(p0(3),k*N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
 quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),U(:,1),U(:,2),U(:,3),1,'k','linewidth',2);
-% visualize Muckerjee embedding-direction 
+% visualize Mukherjee embedding-direction 
 quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'r','linewidth',2);
+% visualize PGA basis
+quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux(:,3),1,'c','linewidth',2);
 
 %% visualize active and inactive manifold-geodesic
 plot3(AMG(:,1),AMG(:,2),AMG(:,3),'k','linewidth',2);
@@ -232,5 +241,7 @@ subplot(1,2,2), contour(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshap
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(Ni)),max(log10(Ni)),min(log10(Ti)),max(log10(Ti))]);
 title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 elseif NN ~= 1
-    figure; loglog(Ni,err,'ko-');
+    figure; loglog(Ni,mean(err,2),'ko-'); hold on; grid on;
+    loglog(Ni,max(err,[],2),Ni,min(err,[],2),'k-');
+    xlabel 'N'; ylabel 'subspace distance'
 end

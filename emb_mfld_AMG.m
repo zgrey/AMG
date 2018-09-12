@@ -1,16 +1,18 @@
 % Compact embedded submanifold AMG (e.g., a sphere)
-clc; close all; clearvars; rng(47);
+clc; close all; clearvars;
 
 %% Convergence study
-% convergence study values (NN and NT are amounts, 2.^Nu and 2.^Tu are upper bounds)
-NN = 13; NT = 1; Tu = 0;
+% convergence study values (NN and NT are amounts, N = 2.^NN and T = 2.^Tu are upper bounds)
+NN = 13; NT = 10; Tu = 2; nboot = 100;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(2.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
-err = ones(NN*NT,1);
+err = ones(NN*NT,nboot);
 
+for j = 1:nboot
 for i = 1:NN*NT
-clc; fprintf('%0.2f%% complete...\n',i/(NN*NT)*100);
+clc; fprintf('%0.2f%% complete...(%i / %i bootstrap)\n',i/(NN*NT)*100,j,nboot);
+rng(j)
 %% The sphere
 % generate random values in parametrization domain
 N = Ni(i);
@@ -90,18 +92,17 @@ for ii=1:N, GGset(:,ii,:) = Exp(tt*Vg(ii),Gt(ii,:),P(ii,:)); end
 
 % logarithmic map of geodesic point set
 Vlog = Log(p0,reshape(Gset,k*N,3));
-% SVD of tangential coordinates for logarithmic map of geodesic point set
-[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*Vlog',0); U = U'*[vt;vt2];
 % Remove bias from PGA
 % logarithmic map of sampled point set
 Vlogx = Log(p0,P);
 [Ux,Dx,~] = svd(1/sqrt(N)*[vt;vt2]*Vlogx',0); Ux = Ux'*[vt;vt2];
-% U = U - Ux; U = [U(1,:)./norm(U(1,:)); U(2,:)./norm(U(2,:))];
+% SVD of tangential coordinates for logarithmic map of geodesic point set
+[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog-repmat(Vlogx,2,1))',0); U = U'*[vt;vt2];
 
 % compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
 % subspace distance to the embedding definition
-err(i) = norm(W*W' - U(1,:)'*U(1,:),2);
+err(i,j) = norm(W*W' - U(1,:)'*U(1,:),2);
 
 % compute active and inactive manifold-geodesic
 AMG = Exp(2*tt,U(1,:),p0); IAMG = Exp(2*tt,U(2,:),p0);
@@ -138,18 +139,19 @@ Ngr = 100; Tr = 2*max([abs(max(Gy(:,1))),abs(min(Gy(:,1)))]); tgr = linspace(-Tr
 % exponential maps along rotated tangent vectors
 Gr = reshape(Exp(tgr,R,repmat(p0,size(R,1)/Nr*Nr,1)),Ngr,size(R,1)/Nr*Nr,3);
 end
+end
 if NT ~= 1
 % compute subspace distance convergence rate
-M = [ones(NT*NN,1) log10(Ti) log10(Ni)]; cerr = M \ log10(err);
+M = [ones(NT*NN,1) log10(Ti) log10(Ni)]; cerr = M \ log10(mean(err,2));
 % coefficient of determination for convergence estimate
-Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
+Rsq = 1 - sum((log10(mean(err,2)) - M*cerr).^2)/sum((log10(mean(err,2)) - mean(log10(mean(err,2)))).^2);
 fprintf('Sub. dist. T convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(3),Rsq);
 elseif NT == 1
 % compute subspace distance convergence rate
-M = [ones(NN,1) log10(Ni)]; cerr = M \ log10(err);
+M = [ones(NN,1) log10(Ni)]; cerr = M \ log10(mean(err,2));
 % coefficient of determination for convergence estimate
-Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
+Rsq = 1 - sum((log10(mean(err,2)) - M*cerr).^2)/sum((log10(mean(err,2)) - mean(log10(mean(err,2)))).^2);
 fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 end
 
@@ -227,17 +229,22 @@ plot(tgr,Func(Exp(2*tgr,U(2,:),pAMG)),'r--','linewidth',2);
 %% Convergence of subspace distance
 if NN ~= 1 && NT ~= 1
 % contour plot of linear fit to log10(err) for convergence rate estimates
-figure; subplot(1,2,1), contourf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*cerr,NT,NN),15);
-colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); hold on; axis square;
+figure; subplot(1,2,1), contourf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*cerr,NT,NN),15); hold on; axis square;
+colorbar;
+% colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); 
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex');
 title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 % surface plot of log10(err) raw data
-subplot(1,2,2), surf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape(log10(err),NT,NN));
-hold on; colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); shading interp; view([0,0,1]); axis([1,log10(max(Ni)),0,log10(max(Ti))]);
+subplot(1,2,2), surf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape(log10(mean(err,2)),NT,NN));
+colorbar; caxis([min(log10(mean(err,2))),max(log10(mean(err,2)))]);
+hold on; shading interp; view([0,0,1]); axis([1,log10(max(Ni)),0,log10(max(Ti))]);
+% colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); 
 % contour expected rates over raw data
 subplot(1,2,2), contour(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*[cerr(1);2;0.5],NT,NN),15,'--','linecolor',0.5*ones(3,1));
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(Ni)),max(log10(Ni)),min(log10(Ti)),max(log10(Ti))]);
 title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 elseif NN ~= 1
-    figure; loglog(Ni,err,'ko-');
+    figure; loglog(Ni,mean(err,2),'ko-'); hold on; grid on;
+    loglog(Ni,max(err,[],2),Ni,min(err,[],2),'k-');
+    xlabel 'N'; ylabel 'subspace distance'
 end
