@@ -1,0 +1,16 @@
+% post-process QiQi airfoil database to check radial convexity of shapes
+% read airfoil
+dirstruct  = dir('~/airfoil_coordinate_database/coordinates/');
+filename   = 
+bndsub = importairfoil(
+% shift and scale
+bndsub = 2*(bndsub - min(bndsub,[],1))./(max(bndsub,[],1)-min(bndsub,[],1)) - 1;
+
+%% circular embedding
+x0 = [mean(bndsub(:,1)),mean(bndsub(:,2))]; bndsub = bndsub - x0;
+s0 = atan2(bndsub(:,2),bndsub(:,1)); angi = find(s0 < 0);
+s0(angi) = s0(angi) + 2*pi; s0 = s0/(2*pi);
+a0 = bndsub(:,1).*cos(2*pi*s0) + bndsub(:,2).*sin(2*pi*s0);
+% take only unique points
+[s0,ia] = unique(s0,'stable');
+a0 = a0(ia); Nu = length(s0);
