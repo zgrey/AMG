@@ -1,11 +1,11 @@
 % Compact embedded submanifold AMG (e.g., a sphere)
-clc; close all; clearvars;
+clc; close all; clearvars; rng(47);
 
 %% Convergence study
-% convergence study values (NN and NT are amounts, N = 2.^NN and T = 2.^Tu are upper bounds)
-NN = 13; NT = 10; Tu = 2; nboot = 100;
+% convergence study values (NN and NT are amounts, 2.^Nu and 2.^Tu are upper bounds)
+NN = 13; NT = 1; Tu = 0; nboot = 10;
 % combinations of N and T for convergence study
-[Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(2.^Ti,NN*NT,1);
+[Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = 2*reshape(2.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
 err = ones(NN*NT,nboot);
 
@@ -229,16 +229,13 @@ plot(tgr,Func(Exp(2*tgr,U(2,:),pAMG)),'r--','linewidth',2);
 %% Convergence of subspace distance
 if NN ~= 1 && NT ~= 1
 % contour plot of linear fit to log10(err) for convergence rate estimates
-figure; subplot(1,2,1), contourf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*cerr,NT,NN),15); hold on; axis square;
-colorbar;
-% colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); 
+figure; subplot(1,2,1), contourf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*cerr,NT,NN),15);
+colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); hold on; axis square;
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex');
 title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 % surface plot of log10(err) raw data
-subplot(1,2,2), surf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape(log10(mean(err,2)),NT,NN));
-colorbar; caxis([min(log10(mean(err,2))),max(log10(mean(err,2)))]);
-hold on; shading interp; view([0,0,1]); axis([1,log10(max(Ni)),0,log10(max(Ti))]);
-% colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); 
+subplot(1,2,2), surf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape(log10(err),NT,NN));
+hold on; colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); shading interp; view([0,0,1]); axis([1,log10(max(Ni)),0,log10(max(Ti))]);
 % contour expected rates over raw data
 subplot(1,2,2), contour(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*[cerr(1);2;0.5],NT,NN),15,'--','linecolor',0.5*ones(3,1));
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(Ni)),max(log10(Ni)),min(log10(Ti)),max(log10(Ti))]);
