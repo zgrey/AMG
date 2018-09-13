@@ -1,5 +1,5 @@
 % uni-variate radially convex embedding sort
-function [ind,S,n,S_rc,pp] = radial_emb_sort(s0,a0,N,lambda,CW)
+function [ind,S,n,S_rc,pp,s0,a0] = radial_emb_sort(s0,a0,N,lambda,CW)
 
 % number of points
 l = length(s0);
