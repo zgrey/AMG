@@ -3,7 +3,7 @@ clc; close all; clearvars;
 
 %% Convergence study
 % convergence study values (NN and NT are amounts, N = 2.^NN and T = 2.^Tu are upper bounds)
-NN = 13; NT = 10; Tu = 2; nboot = 100;
+NN = 10; NT = 1; Tu = 0; nboot = 100;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(2.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
@@ -21,8 +21,8 @@ N = Ni(i);
 % smaller neighborhoods
 % r = (0.75-0.25)*rand(N,1)+ 0.25; th = pi/4*rand(N,1);
 % r = (0.9-0.7)*rand(N,1)+ 0.7; th = pi/2*rand(N,1);
-r = 0.99*rand(N,1); th = pi/4*rand(N,1);
-% r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
+% r = 0.99*rand(N,1); th = pi/4*rand(N,1);
+r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
 
 % sample random ball in parametrization domain
 S = r.*[cos(th),sin(th)];
@@ -55,9 +55,9 @@ m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nme
 % linear ambient function
 % a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
 % quadratic ambient ridge of rank(H) = r <= floor(m/2)
-r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
+% r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
 % highly nonlinear ridge
-% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
+a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
 % w = 0.1; a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); Func = @(XY) sum(sin(pi*XY*a) + cos(pi/2*XY*a),2) + w*sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)') + w*sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1); 
 % highly nonlinear non-ridge
@@ -91,13 +91,19 @@ kk = 50; tt = T*linspace(-1,1,kk)'; GGset = zeros(kk,N,3);
 for ii=1:N, GGset(:,ii,:) = Exp(tt*Vg(ii),Gt(ii,:),P(ii,:)); end
 
 % logarithmic map of geodesic point set
-Vlog = Log(p0,reshape(Gset,k*N,3));
+Pset = reshape(Gset,k*N,3);
+% logarithmic discrepancies of geodesic point set
+Vlog1 = Log(p0,Pset(1:2:end-1,:));
+Vlog2 = Log(p0,Pset(2:2:end,:));
+Vlog = Vlog1 - Vlog2;
+% SVD of tangential coordinates for logarithmic map of geodesic point set
+[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog)',0); U = U'*[vt;vt2];
 % Remove bias from PGA
 % logarithmic map of sampled point set
 Vlogx = Log(p0,P);
 [Ux,Dx,~] = svd(1/sqrt(N)*[vt;vt2]*Vlogx',0); Ux = Ux'*[vt;vt2];
 % SVD of tangential coordinates for logarithmic map of geodesic point set
-[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog-repmat(Vlogx,2,1))',0); U = U'*[vt;vt2];
+% [U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog-repmat(Vlogx,2,1))',0); U = U'*[vt;vt2];
 
 % compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
@@ -140,6 +146,7 @@ Ngr = 100; Tr = 2*max([abs(max(Gy(:,1))),abs(min(Gy(:,1)))]); tgr = linspace(-Tr
 Gr = reshape(Exp(tgr,R,repmat(p0,size(R,1)/Nr*Nr,1)),Ngr,size(R,1)/Nr*Nr,3);
 end
 end
+
 if NT ~= 1
 % compute subspace distance convergence rate
 M = [ones(NT*NN,1) log10(Ti) log10(Ni)]; cerr = M \ log10(mean(err,2));
@@ -244,7 +251,8 @@ subplot(1,2,2), contour(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshap
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(Ni)),max(log10(Ni)),min(log10(Ti)),max(log10(Ti))]);
 title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 elseif NN ~= 1
-    figure; loglog(Ni,mean(err,2),'ko-'); hold on; grid on;
-    loglog(Ni,max(err,[],2),Ni,min(err,[],2),'k-');
+    figure; loglog(Ni,mean(err,2),'ko-','linewidth',2,'MarkerSize',8); hold on; grid on;
+    err_lb = min(err,[],2); err_ub = max(err,[],2);
+    h = fill([Ni; Ni(end:-1:1)],[err_lb; err_ub(end:-1:1)],0.5*ones(1,3)); h.FaceAlpha = 0.25;
     xlabel 'N'; ylabel 'subspace distance'
 end
