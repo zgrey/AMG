@@ -45,17 +45,18 @@ s0 = atan2(P(:,2),P(:,1));
 s0 = s0/(2*pi) + 1/2;
 
 % circular
-nu = [cos(2*pi*s0) , sin(2*pi*s0)];
+a = 1; b = 1;
 % elliptical
-% a = 4; b = 1; nu = [-a*sin(s0*2*pi), b*cos(s0*2*pi)]*[0 -1; 1 0];
+% a = 4; b = 1;
+nu_emb = [b*cos(2*pi*(s0-1/2)) , a*sin(2*pi*(s0-1/2))];
 
-a0 = P(:,1).*nu(:,1) + P(:,2).*nu(:,2);
+a0 = P(:,1).*nu_emb(:,1) + P(:,2).*nu_emb(:,2);
 % take only unique points
 [s0,ia] = unique(s0,'stable');
 a0 = a0(ia); Nu = length(s0);
 % sort points based on embedding
 N = 5000;
-[ind,S,nu,S_rc,pp,s0,a0]= radial_emb_sort(s0,a0,N,10,0);
+[ind,S,nu,S_rc,pp,s,alp]= radial_emb_sort(s0,a0,N,10,0,a,b);
 ind_emb(i) = sum(ind ~= 0);
 
 %% convex check
@@ -65,10 +66,11 @@ nonconvcount(i) = n - length(k);
 %% visualize
 subplot(1,2,1), h1 = scatter(P(:,1),P(:,2),25,'filled','k'); axis equal; hold on;
 subplot(1,2,1), h2 = plot(P(:,1),P(:,2),'k',P(k,1),P(k,2),'r',S_rc(:,1),S_rc(:,2),'g','linewidth',2);
-subplot(1,2,2), h3 = plot(s0,a0,'ko-',linspace(0,1,N),ppval(pp,linspace(0,1,N)),'g--'); grid on; hold on;
-subplot(1,2,2), h4 = scatter(s0(ind(ind ~= 0)),a0(ind(ind ~= 0)),'filled','r');
+% subplot(1,2,1), h6 = quiver(P(:,1),P(:,2),nu(:,1),nu(:,2),'g');
+subplot(1,2,2), h3 = plot(s,alp,'ko-',linspace(0,1,N),ppval(pp,linspace(0,1,N)),'g--','linewidth',1.5); grid on; hold on;
+subplot(1,2,2), h4 = scatter(s(ind(ind ~= 0)),alp(ind(ind ~= 0)),'filled','r');
 h5 = annotation('textbox', [0 0.9 1 0.1], ...
-    'String', ['Directory index i=',num2str(i),' ',dirstruct(2+i).name], ...
+    'String', ['Directory index i=',num2str(i),': ',dirstruct(2+i).name], ...
     'EdgeColor', 'none', ...
     'HorizontalAlignment', 'center');
 print(['./figs/',num2str(i),'_',dirstruct(2+i).name,'.png'],'-dpng')
