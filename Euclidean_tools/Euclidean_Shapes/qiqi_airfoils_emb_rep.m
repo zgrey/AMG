@@ -6,23 +6,22 @@ Naf = size(dirstruct,1)-2;
 ind_emb = ones(Naf,1); nonconvcount = ones(Naf,1);
 for i=1:Naf
 clc; fprintf('%0.2f%% complete...\n',i/(Naf)*100);
-% read nominal points from file
+%% read nominal points from file
 P0 = importairfoil([dirstruct(2+i).folder,'/',dirstruct(2+i).name]);
 % number of points
 n = size(P0,1);
-% sort for atan2 going LE -> TE -> LE (CCW begining at LE)
-[~,LE_i] = min(P0(:,1));
-P0 = [P0(LE_i:end,:);P0(1:LE_i-1,:)];
 
 %% affine transformations (i.e., p  = M*p0   + a)
 % shift and scale to [-1,1] box
-pu = max(P0,[],1)'; pl = min(P0,[],1)';
+% pu = max(P0,[],1)'; pl = min(P0,[],1)';
 % M = diag(2./(pu-pl)); 
 % a = -(M*pl + ones(2,1)); 
+
 % shift and scale using landmark-affine standardization (Bryner, 2D affine and projective spaces)
 C_x = mean(P0,1)'; Sig_x = (P0 - repmat(C_x',n,1))'*(P0 - repmat(C_x',n,1));
 M = chol(Sig_x) \ eye(2); 
 a = -M*C_x;
+
 % shift and scale to center of mass
 % pu = max(P0,[],1)'; pl = min(P0,[],1)';
 % M = diag(2./(pu-pl));
@@ -35,28 +34,38 @@ Minv = inv(M); ainv = -Minv*a;
 P = (P0*M + repmat(a',n,1));
 
 % rotate to mean of first and last point
-ang = atan2(P(1,2),P(1,1)); G = [cos(ang) -sin(ang); sin(ang) cos(ang)];
-P = P*G;
+% ang = atan2(P(1,2)/2 + P(end,2)/2,P(1,1)/2 + P(end,1)/2); G = [cos(ang) -sin(ang); sin(ang) cos(ang)];
+% P = P*G;
+
+% repeat first point to close shape
+P = [P;P(1,:)];
 
 %% embedding
-% compute unique angles
-s0 = atan2(P(:,2),P(:,1));
-% scale to [0,1]
+% compute discrete lengths
+l = cumsum([0; sqrt(( P(2:end,1) - P(1:end-1,1) ).^2 + ( P(2:end,2) - P(1:end-1,2) ).^2)],1);
+% compute unique angles using atan2
+% resolve discontinuity from atan2 by summing angular discrepancies
+% s0 = atan2(P(:,2),P(:,1)); s0 = unwrap(s0);
+ds0 = [atan2(P(1,2),P(1,1));
+       atan2(P(1:end-1,1).*P(2:end,2) - P(1:end-1,2).*P(2:end,1),...
+             P(1:end-1,1).*P(2:end,1) + P(1:end-1,2).*P(2:end,2))];
+s0 = cumsum(ds0);
+
+% scale
 s0 = s0/(2*pi) + 1/2;
 
 % circular
 a = 1; b = 1;
-% elliptical
-% a = 4; b = 1;
 nu_emb = [b*cos(2*pi*(s0-1/2)) , a*sin(2*pi*(s0-1/2))];
-
+% compute inner product
 a0 = P(:,1).*nu_emb(:,1) + P(:,2).*nu_emb(:,2);
 % take only unique points
-[s0,ia] = unique(s0,'stable');
-a0 = a0(ia); Nu = length(s0);
+[l,ia] = unique(l,'stable');
+a0 = a0(ia); s0 = s0(ia);
 % sort points based on embedding
-N = 5000;
-[ind,S,nu,S_rc,pp,s,alp]= radial_emb_sort(s0,a0,N,10,0,a,b);
+N = 500;
+% [ind,S,nu,S_rc,pp,s,alp]= radial_emb_sort(s0,a0,N,10,0,a,b);
+[ind,S,nu,S_emb,pp,ss,s,alp,l]= radial_emb3_sort(s0,a0,l,N);
 ind_emb(i) = sum(ind ~= 0);
 
 %% convex check
@@ -64,18 +73,30 @@ k = convhull(P(:,1),P(:,2));
 nonconvcount(i) = n - length(k);
 
 %% visualize
-subplot(1,2,1), h1 = scatter(P(:,1),P(:,2),25,'filled','k'); axis equal; hold on;
-subplot(1,2,1), h2 = plot(P(:,1),P(:,2),'k',P(k,1),P(k,2),'r',S_rc(:,1),S_rc(:,2),'g','linewidth',2);
-% subplot(1,2,1), h6 = quiver(P(:,1),P(:,2),nu(:,1),nu(:,2),'g');
-subplot(1,2,2), h3 = plot(s,alp,'ko-',linspace(0,1,N),ppval(pp,linspace(0,1,N)),'g--','linewidth',1.5); grid on; hold on;
-subplot(1,2,2), h4 = scatter(s(ind(ind ~= 0)),alp(ind(ind ~= 0)),'filled','r');
+% plot embedding representation
+subplot(1,2,1), h2 = plot(S_emb(:,1),S_emb(:,2),'linewidth',2); axis equal; hold on;
+% plot approximate unit normals
+subplot(1,2,1), h6 = quiver(S_emb(:,1),S_emb(:,2),nu(:,1),nu(:,2),'color',h2(1).Color);
+% plot nominal points
+subplot(1,2,1), h1 = scatter(P(:,1),P(:,2),20,'k');
+% plot embedding at nominal points (check interpolation)
+subplot(1,2,1), h9 = plot(S(:,1),S(:,2),'.','MarkerEdgeColor',h2(1).Color,'MarkerSize',10);
+% plot non-radially convex points
+subplot(1,2,1), h7 = plot(P(ind,1),P(ind,2),'r.','MarkerSize',10);
+% plot convex hull
+subplot(1,2,1), h8 = plot(P(k,1),P(k,2),'--','color',0.75*ones(1,3));
+% plot 3-dim. embedding
+subplot(1,2,2), h3 = plot3(s,alp,l,'ko',ppval(ss,linspace(0,1,N)),ppval(pp,linspace(0,1,N)),linspace(0,1,N)); grid on; hold on;
+% plot non-radially convex points in embedding (non-monotone angles)
+subplot(1,2,2), h4 = scatter3(s(ind(ind ~= 0)),alp(ind(ind ~= 0)),l(ind(ind ~= 0)),'filled','r');
+xlabel 's(t)'; ylabel '\alpha(t)'; zlabel 't';
 h5 = annotation('textbox', [0 0.9 1 0.1], ...
     'String', ['Directory index i=',num2str(i),': ',dirstruct(2+i).name], ...
     'EdgeColor', 'none', ...
     'HorizontalAlignment', 'center');
-print(['./figs/',num2str(i),'_',dirstruct(2+i).name,'.png'],'-dpng')
+print(['./figs_emb3/',num2str(i),'_',dirstruct(2+i).name,'.png'],'-dpng')
 %% clear plot
-delete([h1;h2;h3;h4;h5]);
+delete([h1;h2;h3;h4;h5;h6;h7;h8;h9]); subplot(1,2,1), reset(gca); subplot(1,2,2), reset(gca);
 end
 fprintf('%f%% (%i / %i) are radially convex\n',(Naf - length(find(ind_emb)))/Naf*100,(Naf - length(find(ind_emb))),Naf)
 fprintf('%f%% (%i / %i) are convex\n',(Naf - length(find(nonconvcount)))/Naf*100,(Naf - length(find(nonconvcount))),Naf)
