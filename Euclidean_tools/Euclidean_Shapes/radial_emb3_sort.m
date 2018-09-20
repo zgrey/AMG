@@ -47,6 +47,8 @@ kappa = abs( (dv.*n1 + ppval(pp,tt).*dn1).*(ddv.*n2 + 2*dv.*dn2 + ppval(pp,tt).*
 % refine domain using curvature based importance sampling
 ksum = cumsum(kappa); lb_k = min(ksum); ub_k = max(ksum);
 tt = pchip(1/(ub_k - lb_k)*ksum,tt,linspace(0,1,N)');
+% uniform sampling
+% tt = linspace(0,1,N)';
 
 % compute continuous curvature
 n1   = cos(2*pi*(ppval(ss,tt)-1/2)); n2 = sin(2*pi*(ppval(ss,tt)-1/2));
