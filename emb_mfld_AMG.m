@@ -177,9 +177,9 @@ color = caxis; hold on; axis equal; colorbar;
 % random points
 scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd,'MarkerEdgeColor','k','linewidth',1);
 % random tangent vectors
-% quiver3(P(:,1),P(:,2),P(:,3),Vt(:,1),Vt(:,2),Vt(:,3),1,'k','linewidth',2)
+quiver3(P(:,1),P(:,2),P(:,3),Vt(:,1),Vt(:,2),Vt(:,3),1,'k','linewidth',2)
 % exponential maps along random tangent vectors
-% for i=1:N, plot3(GG(:,i,1),GG(:,i,2),GG(:,i,3),'r','linewidth',2), end
+for i=1:N, plot3(GG(:,i,1),GG(:,i,2),GG(:,i,3),'r','linewidth',2), end
 % gradients of function at random points
 % quiver3(P(:,1),P(:,2),P(:,3),Gt(:,1),Gt(:,2),Gt(:,3),1,'k','linewidth',2)
 fig.CurrentAxes.Visible = 'off';
