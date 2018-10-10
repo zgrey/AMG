@@ -3,7 +3,7 @@ clc; close all; clearvars;
 
 %% Convergence study
 % convergence study values (NN and NT are amounts, N = 2.^NN and T = 0.5.^NT are upper bounds)
-NN = 10; NT = 10; nboot = 100;
+NN = 12; NT = 1; nboot = 10;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(1,NT,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(0.1.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
@@ -11,6 +11,7 @@ err = ones(NN*NT,nboot);
 
 for j = 1:nboot
 for i = 1:NN*NT
+%% print progress
 clc; fprintf('%0.2f%% complete...(%i / %i bootstrap)\n',i/(NN*NT)*100,j,nboot);
 rng(j)
 %% The sphere
@@ -20,9 +21,9 @@ N = Ni(i);
 % r = 0.99*rand(N,1); th = 2*pi*rand(N,1);
 % smaller neighborhoods
 % r = (0.75-0.25)*rand(N,1)+ 0.25; th = pi/4*rand(N,1);
-% r = (0.9-0.7)*rand(N,1)+ 0.7; th = pi/2*rand(N,1);
+r = (0.9-0.7)*rand(N,1)+ 0.7; th = pi/2*rand(N,1);
 % r = 0.99*rand(N,1); th = pi/4*rand(N,1);
-r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
+% r = 0.25*rand(N,1); th = 2*pi*rand(N,1);
 
 % sample random ball in parametrization domain
 S = r.*[cos(th),sin(th)];
@@ -53,15 +54,15 @@ Log = @(p,P) acos(P*p').*(P - P*p'.*repmat(p,size(P,1),1))./sqrt(sum((P - P*p'.*
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
 
 % linear ambient function
-% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
+a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
 % quadratic ambient ridge of rank(H) = r <= floor(m/2)
 % r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
 % highly nonlinear ridge
-a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
+% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
-% w = 0.1; a = 2*rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); Func = @(XY) sum(sin(pi*XY*a) + cos(pi/2*XY*a),2) + w*sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)') + w*sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1); 
+% w = 0.1; aa = 2*rand(m,1)-1; aa = aa/norm(aa); [A,~] = svd(aa); Func = @(XY) sum(sin(pi*XY*aa) + cos(pi/2*XY*aa),2) + w*sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*aa) - pi/2*sin(pi/2*XY*aa),2),sum(aa,2)') + w*sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1); 
 % highly nonlinear non-ridge
-% a = rand(m,1)-1; a = a/norm(a); [A,~] = svd(a); Func = @(XY) sum(sin(pi*XY*a) + cos(pi/2*XY*a),2) + sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)') + sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1);
+% aa = rand(m,1)-1; aa = aa/norm(aa); [A,~] = svd(aa); Func = @(XY) sum(sin(pi*XY*aa) + cos(pi/2*XY*aa),2) + sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*aa) - pi/2*sin(pi/2*XY*aa),2),sum(aa,2)') + sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1);
 
 % Compute values
 F = Func(XY); G =Grad(XY); Frnd = Func(P); Grnd = Grad(P);
@@ -87,7 +88,7 @@ vt2 = cross(p0,vt); Ptan = [p0 + vt; p0 + vt2; p0 - vt; p0 - vt2; p0 + vt;];
 k = 2; t = T*linspace(-1,1,k)'; Vg = sqrt(sum(Gt.^2,2)); Gset = zeros(k,N,3);
 for ii=1:N, Gset(:,ii,:) = Exp(t*Vg(ii),Gt(ii,:),P(ii,:)); end
 % refined geodesic samples (for visualization)
-kk = 50; tt = T*linspace(-1,1,kk)'; GGset = zeros(kk,N,3);
+kk = 50; tt = linspace(-2,2,kk)'; GGset = zeros(kk,N,3);
 for ii=1:N, GGset(:,ii,:) = Exp(tt*Vg(ii),Gt(ii,:),P(ii,:)); end
 
 % logarithmic map of geodesic point set
@@ -96,19 +97,24 @@ Pset = reshape(Gset,k*N,3);
 Vlog1 = Log(p0,Pset(1:2:end-1,:));
 Vlog2 = Log(p0,Pset(2:2:end,:));
 Vlog = Vlog1 - Vlog2;
-% SVD of tangential coordinates for logarithmic map of geodesic point set
-[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog)',0); U = U'*[vt;vt2];
 % Remove bias from PGA
 % logarithmic map of sampled point set
 Vlogx = Log(p0,P);
 [Ux,Dx,~] = svd(1/sqrt(N)*[vt;vt2]*Vlogx',0); Ux = Ux'*[vt;vt2];
+% SVD of tangential coordinates for logarithmic map of geodesic point set
+[U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*Ux*(Vlog)',0); U = U'*Ux;
+% [U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog)',0); U = U'*[vt;vt2];
+
 % SVD of tangential coordinates for logarithmic map of geodesic point set
 % [U,D,~] = svd(1/sqrt(N*(k-1)*(T^2+1))*[vt;vt2]*(Vlog-repmat(Vlogx,2,1))',0); U = U'*[vt;vt2];
 
 % compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
 % subspace distance to the embedding definition
-err(i,j) = norm(W(:,1)*W(:,1)' - U(1,:)'*U(1,:),2);
+if exist('a','var')
+    W = (eye(3) - p0'*p0)*a; W = W./norm(W);
+end
+err(i,j) = norm(W*W' - U(1,:)'*U(1,:),2);
 
 % compute active and inactive manifold-geodesic
 AMG = Exp(2*tt,U(1,:),p0); IAMG = Exp(2*tt,U(2,:),p0);
@@ -121,15 +127,6 @@ Gy = Log(p0,P)*U';
 % first-singular projected geodesic points
 Py = Exp(Gy(:,1),U(1,:),p0);
 
-%% AMG level-set optimizatoin:
-% find the point on the AMG that minimizes the function's variability over the IAMG
-options = optimset('TolX',eps,'TolFun',eps,'Display','on');
-obj = @(t) range(  Func( Exp(linspace(-10,10,500)',U(2,:),Exp(t,U(1,:),p0)) )  );
-[tAMG,obj_opt,exitflag] = fminsearch(obj,0,options);
-pAMG = Exp(tAMG,U(1,:),p0);
-% compute inactive active manifold-geodesic at tAMG
-IAMG_level = Exp(2*tt,U(2,:),pAMG);
-
 %% Rotating geodesics (verification of AMG and IAMG)
 Nr = 25; tr = linspace(0,1,Nr)';
 % geodesic sweep of first quadrant of the tangent space
@@ -140,13 +137,15 @@ R = kron(U(1,:),1-tr)  + kron(U(2,:),tr);
 R = R./sqrt(sum(R.^2,2)); thr = abs(sum(R.*repmat(U(1,:),size(R,1)/Nr*Nr,1),2));
 % plot rotated tangent vectors
 % figure(fig); quiver3(repmat(p0(1),size(R,1)/Nr*Nr,1), repmat(p0(2),size(R,1)/Nr*Nr,1), repmat(p0(3),size(R,1)/Nr*Nr,1), R(:,1), R(:,2), R(:,3),'Color',0.75*ones(3,1))
-% compute rotated geodesics
+% compute rotated geodesics2/99*ii-1
 Ngr = 100; Tr = 2*max([abs(max(Gy(:,1))),abs(min(Gy(:,1)))]); tgr = linspace(-Tr,Tr,Ngr)';
 % exponential maps along rotated tangent vectors
 Gr = reshape(Exp(tgr,R,repmat(p0,size(R,1)/Nr*Nr,1)),Ngr,size(R,1)/Nr*Nr,3);
+
 end
 end
 
+%% compute convergence rates
 if NT ~= 1
 % compute subspace distance convergence rate
 M = [ones(NT*NN,1) log10(Ti) log10(Ni)]; cerr = M \ log10(mean(err,2));
@@ -162,6 +161,26 @@ Rsq = 1 - sum((log10(mean(err,2)) - M*cerr).^2)/sum((log10(mean(err,2)) - mean(l
 fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 end
 
+%% AMG level-set root finding
+% find the point on the AMG that minimizes the function's variability over the IAMG
+options = optimset('TolX',eps,'TolFun',eps,'Display','on');
+obj = @(t) range(  abs(Func( Exp(linspace(-2,2,5000)',U(2,:),Exp(t,U(1,:),p0)) ))  );
+% optimization to determine the inactive submanifold
+tAMG = zeros(100,1); obj_eval = 10*ones(100,1);
+for ii=1:100
+    [tAMG(i),obj_eval(i)] = fminbnd(obj,-2,2,options);
+    %[tAMG(i),obj_eval(i)] = fminsearch(obj,2/99*ii-1,options); 
+end
+[~,opti] = min(obj_eval); tAMG = tAMG(opti);
+% secant method to determine the inactive submanifold (for ridge function)
+% tol = 0.1; t1 = 0; t2 = 1; iter = 0;
+% while obj(t1) > tol && iter < 500, tn = t1 - obj(t1)*(t1 - t2)/( obj(t1) - obj(t2) ); t2 = t1; t1 = tn;  iter = iter + 1; end
+% tAMG = t1;
+% [tAMG,obj_opt,exitflag] = fminsearch(obj,0,options);
+pAMG = Exp(tAMG,U(1,:),p0);
+% compute inactive active manifold-geodesic at tAMG
+IAMG_level = Exp(2*tt,U(2,:),pAMG);
+
 %% Visualizations
 % visualize function on sphere
 fig = figure;
@@ -175,13 +194,12 @@ surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting'
 % mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; alpha(0); axis equal; colormap gray;
 color = caxis; hold on; axis equal; colorbar;
 % random points
-scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd,'MarkerEdgeColor','k','linewidth',1);
-% random tangent vectors
-% quiver3(P(:,1),P(:,2),P(:,3),Vt(:,1),Vt(:,2),Vt(:,3),1,'k','linewidth',2)
+ind = 1:N; if N > 500, ind = 1:500; end
+scatter3(P(ind,1),P(ind,2),P(ind,3),50,'filled','cdata',Frnd(ind),'MarkerEdgeColor','k','linewidth',1);
 % exponential maps along random tangent vectors
-% for i=1:N, plot3(GG(:,i,1),GG(:,i,2),GG(:,i,3),'r','linewidth',2), end
+% for i=1:N, plot3(GG(ind,i,1),GG(ind,i,2),GG(ind,i,3),'r','linewidth',2), end
 % gradients of function at random points
-% quiver3(P(:,1),P(:,2),P(:,3),Gt(:,1),Gt(:,2),Gt(:,3),1,'k','linewidth',2)
+% quiver3(P(ind,1),P(ind,2),P(ind,3),Gt(ind,1),Gt(ind,2),Gt(ind,3),1,'k','linewidth',2)
 fig.CurrentAxes.Visible = 'off';
 
 % visualize converged Karcher mean
@@ -209,12 +227,12 @@ quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux
 
 % visualize active and inactive manifold-geodesic
 plot3(AMG(:,1),AMG(:,2),AMG(:,3),'k','linewidth',2);
-plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'k--','linewidth',2);
+% plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'k--','linewidth',2);
 plot3(EmbG(:,1),EmbG(:,2),EmbG(:,3),'r','linewidth',2);
 
 % visualize inactive active manifold-geodesic at tAMG
 % scatter3(pAMG(1),pAMG(2),pAMG(3),75,'filled','r');
-plot3(IAMG_level(:,1),IAMG_level(:,2),IAMG_level(:,3),'r--','linewidth',2);
+plot3(IAMG_level(:,1),IAMG_level(:,2),IAMG_level(:,3),'k--','linewidth',2);
 
 % visualize rotating geodesics and AMG shadow
 % line color scaling
@@ -225,13 +243,13 @@ fig2 = figure; hold on;
 for ii=1:size(R,1)/Nr*Nr, plot(tgr,Func(reshape(Gr(:,ii,:),Ngr,3)),'-','Color',abs(1-Grscl^thr(ii)/Grscl)*ones(3,1)); end
 % replot AMG sweep
 plot(tgr,Func(reshape(Gr(:,1,:),Ngr,3)),'k','linewidth',2);
-% replot IAMG sweep
-plot(tgr,Func(reshape(Gr(:,Nr,:),Ngr,3)),'k--','linewidth',2);
+% replot IAMG sweep at mean
+% plot(tgr,Func(reshape(Gr(:,Nr,:),Ngr,3)),'k--','linewidth',2);
 % scatter plot over inner products of Log projection
 scatter(Gy(:,1),Frnd,50,'filled','cdata',Frnd); caxis(color);
 ylabel 'f(Exp_x(t; v))'; xlabel 't'
-% plot AMG level-set optimizaton inactive geodesic response
-plot(tgr,Func(Exp(2*tgr,U(2,:),pAMG)),'r--','linewidth',2);
+% plot IAMG level set approximation
+plot(tgr,Func(Exp(2*tgr,U(2,:),pAMG)),'k--','linewidth',2);
 
 % Convergence of subspace distance
 if NN ~= 1 && NT ~= 1
