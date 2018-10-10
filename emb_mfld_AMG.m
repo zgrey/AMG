@@ -108,7 +108,7 @@ Vlogx = Log(p0,P);
 % compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
 % subspace distance to the embedding definition
-err(i,j) = norm(W*W' - U(1,:)'*U(1,:),2);
+err(i,j) = norm(W(:,1)*W(:,1)' - U(1,:)'*U(1,:),2);
 
 % compute active and inactive manifold-geodesic
 AMG = Exp(2*tt,U(1,:),p0); IAMG = Exp(2*tt,U(2,:),p0);
@@ -240,16 +240,16 @@ figure; subplot(1,2,1), contourf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,N
 colorbar;
 % colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); 
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex');
-title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
+title(['$$\log_{10}\left(\Vert\hat{W_',num2str(1),'}\hat{W_',num2str(1),'}^T - \hat{U_',num2str(1),'}\hat{U_',num2str(1),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 % surface plot of log10(err) raw data
 subplot(1,2,2), surf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape(log10(mean(err,2)),NT,NN));
 colorbar; caxis([min(log10(mean(err,2))),max(log10(mean(err,2)))]);
-hold on; shading interp; view([0,0,1]); axis([1,log10(max(Ni)),0,log10(max(Ti))]);
+hold on; shading interp; view([0,0,1]); axis([1,log10(max(Ni)),log10(min(Ti)),log10(max(Ti))]);
 % colorbar('Ticks',[-16,-14,-12,-10,-8,-6,-4,-2,0]); caxis([-16,-1]); 
 % contour expected rates over raw data
-subplot(1,2,2), contour(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*[cerr(1);2;0.5],NT,NN),15,'--','linecolor',0.5*ones(3,1));
+subplot(1,2,2), contour(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*[cerr(1);0;0.5],NT,NN),15,'--','linecolor',0.5*ones(3,1));
 xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(Ni)),max(log10(Ni)),min(log10(Ti)),max(log10(Ti))]);
-title(['$$\log_{10}\left(\Vert\hat{W_',num2str(r),'}\hat{W_',num2str(r),'}^T - \hat{U_',num2str(r),'}\hat{U_',num2str(r),'}^T\Vert_2\right)$$'],'Interpreter','latex');
+title(['$$\log_{10}\left(\Vert\hat{W_',num2str(1),'}\hat{W_',num2str(1),'}^T - \hat{U_',num2str(1),'}\hat{U_',num2str(1),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 elseif NN ~= 1
     figure; loglog(Ni,mean(err,2),'ko-','linewidth',2,'MarkerSize',8); hold on; grid on;
     err_lb = min(err,[],2); err_ub = max(err,[],2);
