@@ -2,10 +2,10 @@
 clc; close all; clearvars;
 
 %% Convergence study
-% convergence study values (NN and NT are amounts, N = 2.^NN and T = 2.^Tu are upper bounds)
-NN = 10; NT = 1; Tu = 0; nboot = 100;
+% convergence study values (NN and NT are amounts, N = 2.^NN and T = 0.5.^NT are upper bounds)
+NN = 10; NT = 10; nboot = 100;
 % combinations of N and T for convergence study
-[Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(0,Tu,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(2.^Ti,NN*NT,1);
+[Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(1,NT,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(0.1.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
 err = ones(NN*NT,nboot);
 
@@ -163,7 +163,7 @@ fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 end
 
 %% Visualizations
-%% visualize function on sphere
+% visualize function on sphere
 fig = figure;
 % simple filled surface
 surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting','gouraud','EdgeAlpha',0);
@@ -177,46 +177,46 @@ color = caxis; hold on; axis equal; colorbar;
 % random points
 scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd,'MarkerEdgeColor','k','linewidth',1);
 % random tangent vectors
-quiver3(P(:,1),P(:,2),P(:,3),Vt(:,1),Vt(:,2),Vt(:,3),1,'k','linewidth',2)
+% quiver3(P(:,1),P(:,2),P(:,3),Vt(:,1),Vt(:,2),Vt(:,3),1,'k','linewidth',2)
 % exponential maps along random tangent vectors
-for i=1:N, plot3(GG(:,i,1),GG(:,i,2),GG(:,i,3),'r','linewidth',2), end
+% for i=1:N, plot3(GG(:,i,1),GG(:,i,2),GG(:,i,3),'r','linewidth',2), end
 % gradients of function at random points
 % quiver3(P(:,1),P(:,2),P(:,3),Gt(:,1),Gt(:,2),Gt(:,3),1,'k','linewidth',2)
 fig.CurrentAxes.Visible = 'off';
 
-%% visualize converged Karcher mean
+% visualize converged Karcher mean
 scatter3(p0(1),p0(2),p0(3),75,'k','filled','MarkerEdgeColor','k','linewidth',2);
 
-%% visualize tangent space at mean
+% visualize tangent space at mean
 % quiver3(p0(1),p0(2),p0(3),vt(1),vt(2),vt(3),1,'k--','linewidth',2);
 % quiver3(p0(1),p0(2),p0(3),vt2(1),vt2(2),vt2(3),1,'k--','linewidth',2);
 % tangent plane at mean
 plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',2)
 
-%% plot geodesic set paths
+% plot geodesic set paths
 % for i=1:N, plot3(GGset(:,i,1),GGset(:,i,2),GGset(:,i,3),'k','linewidth',1.5), end
 % plot the geodesic set points
 % scatter3(reshape(Gset(:,:,1),k*N,1),reshape(Gset(:,:,2),k*N,1),reshape(Gset(:,:,3),k*N,1),'k')
 
-%% visualize log map vectors
+% visualize log map vectors
 % quiver3(repmat(p0(1),k*N,1),repmat(p0(2),k*N,1),repmat(p0(3),k*N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
 quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),U(:,1),U(:,2),U(:,3),1,'k','linewidth',2);
-% visualize Mukherjee embedding-direction 
+% visualize Mukherjee embedding projection 
 quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'r','linewidth',2);
 % visualize PGA basis
 quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux(:,3),1,'c','linewidth',2);
 
-%% visualize active and inactive manifold-geodesic
+% visualize active and inactive manifold-geodesic
 plot3(AMG(:,1),AMG(:,2),AMG(:,3),'k','linewidth',2);
 plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'k--','linewidth',2);
 plot3(EmbG(:,1),EmbG(:,2),EmbG(:,3),'r','linewidth',2);
 
-%% visualize inactive active manifold-geodesic at tAMG
+% visualize inactive active manifold-geodesic at tAMG
 % scatter3(pAMG(1),pAMG(2),pAMG(3),75,'filled','r');
-% plot3(IAMG_level(:,1),IAMG_level(:,2),IAMG_level(:,3),'r--','linewidth',2);
+plot3(IAMG_level(:,1),IAMG_level(:,2),IAMG_level(:,3),'r--','linewidth',2);
 
-%% visualize rotating geodesics and AMG shadow
+% visualize rotating geodesics and AMG shadow
 % line color scaling
 Grscl = 10;
 % for i=1:size(R,1)/Nr*Nr, plot3(Gr(:,i,1),Gr(:,i,2),Gr(:,i,3),'linewidth',1,'color',abs(1-Grscl^thr(i)/Grscl)*ones(3,1)), end
@@ -233,7 +233,7 @@ ylabel 'f(Exp_x(t; v))'; xlabel 't'
 % plot AMG level-set optimizaton inactive geodesic response
 plot(tgr,Func(Exp(2*tgr,U(2,:),pAMG)),'r--','linewidth',2);
 
-%% Convergence of subspace distance
+% Convergence of subspace distance
 if NN ~= 1 && NT ~= 1
 % contour plot of linear fit to log10(err) for convergence rate estimates
 figure; subplot(1,2,1), contourf(reshape(log10(Ni),NT,NN),reshape(log10(Ti),NT,NN),reshape([ones(NT*NN,1), log10(Ti), log10(Ni)]*cerr,NT,NN),15); hold on; axis square;
