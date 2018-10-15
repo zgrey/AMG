@@ -41,7 +41,7 @@ H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
 
 %% Subpsace convergence study
 % convergence study values (NN and NT are amounts, N = 2.^NN and T = 0.5.^NT are upper bounds)
-NN = 10; NT = 1; nboot = 10;
+NN = 12; NT = 1; nboot = 100;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(1,NT,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(0.1.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study

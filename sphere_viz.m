@@ -56,15 +56,15 @@ fig1.CurrentAxes.Visible = 'off';
 N = 1; S = [1.4*pi, pi/2]; P = X(S); rng(2);
 Vt = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vt = Vt/norm(Vt);
 % compute exponentials along tangent vector
-k = 50; t = 2*linspace(0,1,k)'; geo = Exp(t,Vt,P);
+speed = 1.75; k = 50; t = speed*linspace(0,1,k)'; geo = Exp(t,Vt,P);
 
 % exponential map
 fig2 = figure;
-mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray; alpha(0.75);
+mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray; alpha(1);
 plot3(geo(:,1),geo(:,2),geo(:,3),'k','linewidth',2);
-scatter3(P(1),P(2),P(3),50,'filled','g');
-scatter3(geo(end,1),geo(end,2),geo(end,3),50,'filled','r');
-quiver3(P(:,1),P(:,2),P(:,3),2*Vt(:,1),2*Vt(:,2),2*Vt(:,3),1,'b','linewidth',2);
+scatter3(P(1),P(2),P(3),80,'filled','g');
+scatter3(geo(end,1),geo(end,2),geo(end,3),80,'filled','r');
+quiver3(P(:,1),P(:,2),P(:,3),speed*Vt(:,1),speed*Vt(:,2),speed*Vt(:,3),1,'b','linewidth',2);
 fig2.CurrentAxes.Visible = 'off';
 
 % Parallel translation approximation
