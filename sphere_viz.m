@@ -67,4 +67,53 @@ scatter3(geo(end,1),geo(end,2),geo(end,3),80,'filled','r');
 quiver3(P(:,1),P(:,2),P(:,3),speed*Vt(:,1),speed*Vt(:,2),speed*Vt(:,3),1,'b','linewidth',2);
 fig2.CurrentAxes.Visible = 'off';
 
-% Parallel translation approximation
+%% Parallel translation approximation
+N = 1; S = [1.4*pi, pi/2]; P0 = X(S); rng(2); k = 50; T = 1; t=T*linspace(0,1,k)';
+Vt = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vt = Vt/norm(Vt); P1 = Exp(T,Vt,P0); geo01 = Exp(t,Vt,P0);
+Vp = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vp = Vp/norm(Vp);
+
+% central-differencing ladder
+tau = 0.25; t=linspace(-1,1,50)';
+P2    = Exp(tau,Vp,P0); P3 = Exp(-tau,Vp,P0); geo0 = Exp(tau*t,Vp,P0);
+Vlog2 = Log(P1,P2); Vlog3 = Log(P1,P3);
+diff = 1/(2*tau)*(Vlog2 - Vlog3);
+
+% visualize ladder
+fig3 = figure;
+mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray; alpha(1); fig3.CurrentAxes.Visible = 'off';
+scatter3(P0(1),P0(2),P0(3),80,'filled','g');
+scatter3(P1(1),P1(2),P1(3),80,'filled','r');
+Pdiff = [P2;P3]; scatter3(Pdiff(:,1),Pdiff(:,2),Pdiff(:,3),80,'filled','b')
+plot3(geo01(:,1),geo01(:,2),geo01(:,3),'k','linewidth',2);
+plot3(geo0(:,1),geo0(:,2),geo0(:,3),'b','linewidth',2);
+quiver3(P0(1),P0(2),P0(3),Vp(1),Vp(2),Vp(3),'g','linewidth',2);
+quiver3([P1(1);P1(1)],[P1(2);P1(2)],[P1(3);P1(3)],[Vlog2(1);Vlog3(1)],[Vlog2(2);Vlog3(2)],[Vlog2(3);Vlog3(3)],'b','linewidth',2);
+quiver3(P1(1),P1(2),P1(3),diff(1),diff(2),diff(3),'r','linewidth',2);
+
+% visualize multiple rungs
+fig4 = figure;
+mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray; alpha(1); fig4.CurrentAxes.Visible = 'off';
+plot3(geo01(:,1),geo01(:,2),geo01(:,3),'k','linewidth',2);
+nrung = 5; T = 1/nrung; vp = Vp; P = Exp(linspace(0,1,nrung)',Vt,P0);
+for i=1:nrung-1
+    P0 = P(i,:); P1 = P(i+1,:);
+    % central-differencing ladder
+    tau = 0.1; t=linspace(-1,1,50)';
+    P2    = Exp(tau,Vp,P0); P3 = Exp(-tau,Vp,P0); geo0 = Exp(tau*t,Vp,P0);
+    Vlog2 = Log(P1,P2); Vlog3 = Log(P1,P3);
+    diff = 1/(2*tau)*(Vlog2 - Vlog3);
+
+    % visualize ladder
+    scatter3(P0(1),P0(2),P0(3),80,'filled','g');
+    scatter3(P1(1),P1(2),P1(3),80,'filled','r');
+    Pdiff = [P2;P3]; scatter3(Pdiff(:,1),Pdiff(:,2),Pdiff(:,3),80,'filled','b')
+    plot3(geo0(:,1),geo0(:,2),geo0(:,3),'b','linewidth',2);
+    quiver3(P0(1),P0(2),P0(3),Vp(1),Vp(2),Vp(3),'g','linewidth',2);
+    quiver3([P1(1);P1(1)],[P1(2);P1(2)],[P1(3);P1(3)],[Vlog2(1);Vlog3(1)],[Vlog2(2);Vlog3(2)],[Vlog2(3);Vlog3(3)],'b','linewidth',2);
+    quiver3(P1(1),P1(2),P1(3),diff(1),diff(2),diff(3),'r','linewidth',2);
+
+    % update vector transport
+    Vp = diff;
+end
+
+% Schild's ladder
