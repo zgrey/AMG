@@ -17,11 +17,11 @@ Log = @(p,P) acos(P*p').*(P - P*p'.*repmat(p,size(P,1),1))./sqrt(sum((P - P*p'.*
 
 %% Parametrize a neighborhood
 % entire upper hemisphere
-% rad =@(N) 0.99*rand(N,1); theta =@(N) 2*pi*rand(N,1);
+rad =@(N) 0.99*rand(N,1); theta =@(N) 2*pi*rand(N,1);
 % smaller neighborhoods
 % rad =@(N) (0.75-0.25)*rand(N,1)+ 0.25; theta =@(N) pi/4*rand(N,1);
 % rad =@(N) (0.9-0.7)*rand(N,1)+ 0.7; theta =@(N) pi/2*rand(N,1);
-rad =@(N) 0.99*rand(N,1); theta =@(N) pi/4*rand(N,1);
+% rad =@(N) 0.99*rand(N,1); theta =@(N) pi/4*rand(N,1);
 % rad =@(N) 0.25*rand(N,1); theta =@(N) 2*pi*rand(N,1);
 
 %% Ambient map on the sphere
@@ -32,7 +32,7 @@ a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size
 % r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
 % quadratic with preferential directions (my method is typically better)
 % H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
-% highly nonlinear ridge
+% highly nonlinear 10ridge
 % a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
 % w = 0.1; aa = 2*rand(m,1)-1; aa = aa/norm(aa); [A,~] = svd(aa); Func = @(XY) sum(sin(pi*XY*aa) + cos(pi/2*XY*aa),2) + w*sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*aa) - pi/2*sin(pi/2*XY*aa),2),sum(aa,2)') + w*sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1); 
@@ -111,7 +111,7 @@ Pset = reshape(Gset,k*N,3);
 % Vlog = 1/T*(Vlog2 - Vlog1);
 
 % [central diff-ladder] 
-Vlog = zeros(N,3); Nrungs = 10;
+Vlog = zeros(N,3); Nrungs = 100;
 for ii=1:N
     Vlog(ii,:) = diff_ladder(P(ii,:),p0,Gt(ii,:),Exp,Log,Nrungs);
 end

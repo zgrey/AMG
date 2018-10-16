@@ -70,7 +70,7 @@ fig2.CurrentAxes.Visible = 'off';
 %% Parallel translation approximation
 N = 1; S = [1.4*pi, pi/2]; P0 = X(S); rng(2); k = 50; T = 1; t=T*linspace(0,1,k)';
 Vt = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vt = Vt/norm(Vt); P1 = Exp(T,Vt,P0); geo01 = Exp(t,Vt,P0);
-Vp = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vp = Vp/norm(Vp);
+Vp = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vp = Vp/norm(Vp); V0 = Vp;
 
 % central-differencing ladder
 tau = 0.25; t=linspace(-1,1,50)';
@@ -94,26 +94,35 @@ quiver3(P1(1),P1(2),P1(3),diff(1),diff(2),diff(3),'r','linewidth',2);
 fig4 = figure;
 mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray; alpha(1); fig4.CurrentAxes.Visible = 'off';
 plot3(geo01(:,1),geo01(:,2),geo01(:,3),'k','linewidth',2);
-nrung = 5; T = 1/nrung; vp = Vp; P = Exp(linspace(0,1,nrung)',Vt,P0);
+nrung = 5; T = 1/nrung; P = Exp(linspace(0,1,nrung)',Vt,P0);
 for i=1:nrung-1
-    P0 = P(i,:); P1 = P(i+1,:);
+    p0 = P(i,:); p1 = P(i+1,:);
     % central-differencing ladder
     tau = 0.1; t=linspace(-1,1,50)';
-    P2    = Exp(tau,Vp,P0); P3 = Exp(-tau,Vp,P0); geo0 = Exp(tau*t,Vp,P0);
-    Vlog2 = Log(P1,P2); Vlog3 = Log(P1,P3);
+    P2    = Exp(tau,Vp,p0); P3 = Exp(-tau,Vp,p0); geo0 = Exp(tau*t,Vp,p0);
+    Vlog2 = Log(p1,P2); Vlog3 = Log(p1,P3);
     diff = 1/(2*tau)*(Vlog2 - Vlog3);
 
     % visualize ladder
-    scatter3(P0(1),P0(2),P0(3),80,'filled','g');
-    scatter3(P1(1),P1(2),P1(3),80,'filled','r');
+    scatter3(p0(1),p0(2),p0(3),80,'filled','g');
+    scatter3(p1(1),p1(2),p1(3),80,'filled','r');
     Pdiff = [P2;P3]; scatter3(Pdiff(:,1),Pdiff(:,2),Pdiff(:,3),80,'filled','b')
     plot3(geo0(:,1),geo0(:,2),geo0(:,3),'b','linewidth',2);
-    quiver3(P0(1),P0(2),P0(3),Vp(1),Vp(2),Vp(3),'g','linewidth',2);
-    quiver3([P1(1);P1(1)],[P1(2);P1(2)],[P1(3);P1(3)],[Vlog2(1);Vlog3(1)],[Vlog2(2);Vlog3(2)],[Vlog2(3);Vlog3(3)],'b','linewidth',2);
-    quiver3(P1(1),P1(2),P1(3),diff(1),diff(2),diff(3),'r','linewidth',2);
+    quiver3(p0(1),p0(2),p0(3),Vp(1),Vp(2),Vp(3),'g','linewidth',2);
+    quiver3([p1(1);p1(1)],[p1(2);p1(2)],[p1(3);p1(3)],[Vlog2(1);Vlog3(1)],[Vlog2(2);Vlog3(2)],[Vlog2(3);Vlog3(3)],'b','linewidth',2);
+    quiver3(p1(1),p1(2),p1(3),diff(1),diff(2),diff(3),'r','linewidth',2);
 
     % update vector transport
     Vp = diff;
 end
 
+% convergence
+err = ones(10,3); nrung=2.^linspace(0,10,10)';
+for i=1:length(nrung)
+    vp = diff_ladder(P0,P1,V0,Exp,Log,nrung(i));
+    err(i,:) = vp;
+end
+err = err(1:end-1,:) - repmat(err(end,:),length(nrung)-1,1);
+err = sqrt(err(:,1).^2 + err(:,2).^2 + err(:,3).^2);
+figure; loglog(nrung(1:end-1),err,'ko-'); grid on;
 % Schild's ladder
