@@ -70,7 +70,7 @@ fig2.CurrentAxes.Visible = 'off';
 %% Parallel translation approximation
 N = 1; S = [1.4*pi, pi/2]; P0 = X(S); rng(2); k = 50; T = 1; t=T*linspace(0,1,k)';
 Vt = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vt = Vt/norm(Vt); P1 = Exp(T,Vt,P0); geo01 = Exp(t,Vt,P0);
-Vp = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vp = Vp/norm(Vp); V0 = Vp;
+Vp = (2*rand(1,2) - 1)*J(S(1,1),S(1,2))'; Vp = Vp/norm(Vp); v0 = Vp;
 
 % central-differencing ladder
 tau = 0.25; t=linspace(-1,1,50)';
@@ -116,13 +116,20 @@ for i=1:nrung-1
     Vp = diff;
 end
 
-% convergence
-err = ones(10,3); nrung=2.^linspace(0,10,10)';
+% convergence of differencing ladder
+err = ones(10,3); nrung=2.^linspace(0,15,15)';
 for i=1:length(nrung)
-    vp = diff_ladder(P0,P1,V0,Exp,Log,nrung(i));
+    vp = diff_ladder(P0,P1,v0,Exp,Log,nrung(i));
     err(i,:) = vp;
 end
 err = err(1:end-1,:) - repmat(err(end,:),length(nrung)-1,1);
 err = sqrt(err(:,1).^2 + err(:,2).^2 + err(:,3).^2);
 figure; loglog(nrung(1:end-1),err,'ko-'); grid on;
+xlabel 'number of rungs'; ylabel 'error';
+% compute subspace distance convergence rate
+M = [ones(length(nrung)-1,1) log10(nrung(1:end-1))]; cerr = M \ log10(err);
+% coefficient of determination for convergence estimate
+Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
+fprintf('Differencing ladder convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
+
 % Schild's ladder

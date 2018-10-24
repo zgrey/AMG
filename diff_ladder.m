@@ -11,7 +11,7 @@ for i=1:N-1
     P0 = geo(i,:); P1 = geo(i+1,:);
 
     % central-differencing ladder
-    tau = 0.1;
+    tau = 0.01;
     P2    = Exp(tau,V1,P0); P3    = Exp(-tau,V1,P0);
     Vlog2 = Log(P1,P2);     Vlog3 = Log(P1,P3);
     V1 = 1/(2*tau)*(Vlog2 - Vlog3);
