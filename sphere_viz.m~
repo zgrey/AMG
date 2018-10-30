@@ -117,17 +117,14 @@ for i=1:nrung-1
 end
 
 % convergence of differencing ladder
-N = 15; nrung=2.^linspace(0,N,N)'; err = ones(N,3); err_schilds = ones(N,1);
+err = ones(10,3); nrung=2.^linspace(0,15,15)';
 for i=1:length(nrung)
     vp = diff_ladder(P0,P1,v0,Exp,Log,nrung(i));
-    vp_s = schilds_ladder(P0,P1,v0,Exp,Log,nrung(i));
     err(i,:) = vp;
-    err_schilds(i) = norm(vp-vp_s);
 end
 err = err(1:end-1,:) - repmat(err(end,:),length(nrung)-1,1);
 err = sqrt(err(:,1).^2 + err(:,2).^2 + err(:,3).^2);
-figure; loglog(nrung(1:end-1),err,'ko-'); grid on; hold on;
-loglog(nrung,err_schilds,'bo-');
+figure; loglog(nrung(1:end-1),err,'ko-'); grid on;
 xlabel 'number of rungs'; ylabel 'error';
 % compute subspace distance convergence rate
 M = [ones(length(nrung)-1,1) log10(nrung(1:end-1))]; cerr = M \ log10(err);
@@ -138,10 +135,10 @@ fprintf('Differencing ladder convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 % Schild's ladder
 
 %% Smooth 2-tensor study
-N = 400; [u,v] = meshgrid(linspace(0,2*pi,sqrt(N)),linspace(0,pi,sqrt(N)));
+N = 100; [u,v] = meshgrid(linspace(0,2*pi,sqrt(N)),linspace(0,pi,sqrt(N)));
 S = reshape([u,v],N,2); P = X(S);
 % random smooth curve
-Ncurv = 200; 
+Ncurv = 100; 
 t = linspace(0,2*pi,Ncurv)'; sc = [2*pi*(cos(t)+1), pi*(sin(t)+1)];
 p0 = X(sc);
 
@@ -160,7 +157,7 @@ B1 = B1./sqrt(sum(B1.^2,2)); B2 = cross(p0,B1,2);
 fig5 = figure;
 % visualize map on sphere
 surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting','gouraud','EdgeAlpha',0);
-hold on; axis equal; alpha(0.25); fig5.CurrentAxes.Visible = 'off';
+hold on; axis equal; alpha(0.5); fig5.CurrentAxes.Visible = 'off';
 % scatter3(P(:,1),P(:,2),P(:,3),50,'filled','cdata',Frnd);
 % quiver3(P(:,1),P(:,2),P(:,3),Gt(:,1),Gt(:,2),Gt(:,3),1,'k');
 % visualize curve on sphere
@@ -173,8 +170,8 @@ for i=1:Ncurv
     % [central diff-ladder] 
     Vlog = zeros(N,3); Nrungs = 100;
     for ii=1:N
-        Vlog(ii,:) = diff_ladder(P(ii,:),p0(i,:),Gt(ii,:),Exp,Log,Nrungs);
-%         Vlog(ii,:) = schilds_ladder(P(ii,:),p0(i,:),Gt(ii,:),Exp,Log,Nrungs);
+%         Vlog(ii,:) = diff_ladder(P(ii,:),p0(i,:),Gt(ii,:),Exp,Log,Nrungs);
+        Vlog(ii,:) = schilds_ladder(P(ii,:),p0(i,:),Gt(ii,:),Exp,Log,Nrungs);
     end
 
     % SVD of parallel translation
@@ -187,7 +184,7 @@ for i=1:Ncurv
     % compute error
     err(i) = 1 - abs(U1(i,:)*Proj_a);
     % fix direction
-    if U1(i,:)*Proj_a < 0, U1(i,:) = -U1(i,:); U2(i,:) = -U2(i,:); end
+    if U1(i,:)*Proj_a < 0, U1(i,:) = -U1(i,:); end
     
     Ptan = [p0(i,:) + B1(i,:); p0(i,:) + B2(i,:); p0(i,:) - B1(i,:); p0(i,:) - B2(i,:); p0(i,:) + B1(i,:);];
     % visualize tangent space at point
@@ -195,8 +192,8 @@ for i=1:Ncurv
     h2 = plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',1);
     % plot AMG basis
     h3 = quiver3(p0(i,1),p0(i,2),p0(i,3),U1(i,1),U1(i,2),U1(i,3),1,'k','linewidth',2);
-    h4 = quiver3(p0(i,1),p0(i,2),p0(i,3),U2(i,1),U2(i,2),U2(i,3),1,'k--','linewidth',2);
-%     h4 = quiver3(p0(i,1)*ones(N,1),p0(i,2)*ones(N,1),p0(i,3)*ones(N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),'k--','linewidth',1);
+    % h4 = quiver3(p0(i,1),p0(i,2),p0(i,3),U2(i,1),U2(i,2),U2(i,3),1,'k--','linewidth',2);
+    h4 = quiver3(p0(i,1)*ones(N,1),p0(i,2)*ones(N,1),p0(i,3)*ones(N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),'k--','linewidth',1);
     % plot projected ridge direction
     h5 = quiver3(p0(i,1),p0(i,2),p0(i,3),Proj_a(1),Proj_a(2),Proj_a(3),'r','linewidth',2);
 
