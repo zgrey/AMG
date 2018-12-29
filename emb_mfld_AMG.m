@@ -41,7 +41,7 @@ a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size
 
 %% Subpsace convergence study
 % convergence study values (NN and NT are amounts, N = 2.^NN and T = 0.5.^NT are upper bounds)
-NN =12; NT = 1; nboot = 10;
+NN = 2; NT = 1; nboot = 1;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(1,NT,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(0.1.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study
@@ -97,6 +97,11 @@ for ii=1:N, Gset(:,ii,:) = Exp(t*Vg(ii),Gt(ii,:),P(ii,:)); end
 % log-map of geodesic point set
 Pset = reshape(Gset,k*N,3);
 
+% compute coordinates for PGA basis
+% logarithmic map of sampled point set
+Vlogx = Log(p0,P);
+[Ux,Dx,~] = svd(1/sqrt(N)*[vt;vt2]*Vlogx',0); Ux = Ux'*[vt;vt2];
+
 % [method]
 % [geodesic extensions] log-map of geodesic extensions (large T)
 % Vlog = Log(p0,Pset);
@@ -112,7 +117,7 @@ Pset = reshape(Gset,k*N,3);
 % Vlog = 1/T*(Vlog2 - Vlog1);
 
 % [central diff-ladder] 
-Vlog = zeros(N,3); Nrungs = 100;
+Vlog = zeros(N,3); Nrungs = 1e4;
 for ii=1:N
     Vlog(ii,:) = diff_ladder(P(ii,:),p0,Gt(ii,:),Exp,Log,Nrungs);
 end
@@ -123,12 +128,14 @@ end
 %     Vlog(ii,:) = schilds_ladder(P(ii,:),p0,Gt(ii,:),Exp,Log,Nrungs);
 % end
 
-% compute coordinates from PGA basis
-% logarithmic map of sampled point set
-Vlogx = Log(p0,P);
-[Ux,Dx,~] = svd(1/sqrt(N)*[vt;vt2]*Vlogx',0); Ux = Ux'*[vt;vt2];
-% SVD of tangential coordinates for logarithmic map of geodesic point set
-[U,D,~] = svd(1/sqrt(N)*Ux*(Vlog)',0); U = U'*Ux;
+% [angle preserving isometry] NOT WORKING
+% Vlog = zeros(N,3);
+% for ii=1:N
+%     Vlog(ii,:) = iso_angle(P(ii,:),p0,Gt(ii,:),Ux',Log);
+% end
+
+% SVD of tangential vectors
+[U,D,~] = svd(1/sqrt(N)*Ux*Vlog',0); U = U'*Ux;
 
 % compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
@@ -225,7 +232,7 @@ plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',2)
 % scatter3(reshape(Gset(:,:,1),k*N,1),reshape(Gset(:,:,2),k*N,1),reshape(Gset(:,:,3),k*N,1),'k')
 
 % visualize log map vectors
-% quiver3(repmat(p0(1),N,1),repmat(p0(2),N,1),repmat(p0(3),N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
+quiver3(repmat(p0(1),N,1),repmat(p0(2),N,1),repmat(p0(3),N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
 quiver3(p0(1),p0(2),p0(3),U(1,1),U(1,2),U(1,3),1,'k','linewidth',2);
 quiver3(p0(1),p0(2),p0(3),U(2,1),U(2,2),U(2,3),1,'k--','linewidth',2);

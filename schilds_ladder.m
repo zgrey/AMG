@@ -15,7 +15,7 @@ for i=1:N-1
 
     % Schild's ladder
     % scale rungs on ladder
-    tau = 0.1;
+    tau = t(i+1) - t(i);
     % geodesic from first point in direction
     P2  = Exp(1*tau,V1,P0);
     % "mid-point" between P2 and P1

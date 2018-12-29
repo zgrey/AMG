@@ -117,25 +117,27 @@ for i=1:nrung-1
 end
 
 % convergence of differencing ladder
-N = 15; nrung=2.^linspace(0,N,N)'; err = ones(N,3); err_schilds = ones(N,1);
+N = 15; nrung=2.^linspace(0,N,N)'; err = ones(N,3); err_schilds = ones(N,1); err_ang = ones(N,1);
+% compute angle to check for isometry
+cost0 = v0*Vt'/(norm(v0)*norm(vt));
 for i=1:length(nrung)
     vp = diff_ladder(P0,P1,v0,Exp,Log,nrung(i));
     vp_s = schilds_ladder(P0,P1,v0,Exp,Log,nrung(i));
     err(i,:) = vp;
-    err_schilds(i) = norm(vp-vp_s);
+    err_schilds(i) = abs(-vp_s*Log(P1,P0)'/(norm(vp_s)*norm(Log(P1,P0))) - cost0);
+    err_ang(i) = abs(-vp*Log(P1,P0)'/(norm(vp)*norm(Log(P1,P0))) - cost0);
 end
 err = err(1:end-1,:) - repmat(err(end,:),length(nrung)-1,1);
 err = sqrt(err(:,1).^2 + err(:,2).^2 + err(:,3).^2);
 figure; loglog(nrung(1:end-1),err,'ko-'); grid on; hold on;
 loglog(nrung,err_schilds,'bo-');
+loglog(nrung,err_ang,'ro-');
 xlabel 'number of rungs'; ylabel 'error';
 % compute subspace distance convergence rate
 M = [ones(length(nrung)-1,1) log10(nrung(1:end-1))]; cerr = M \ log10(err);
 % coefficient of determination for convergence estimate
 Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
 fprintf('Differencing ladder convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
-
-% Schild's ladder
 
 %% Smooth 2-tensor study
 N = 400; [u,v] = meshgrid(linspace(0,2*pi,sqrt(N)),linspace(0,pi,sqrt(N)));
