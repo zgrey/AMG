@@ -27,11 +27,11 @@ rad =@(N) 0.99*rand(N,1); theta =@(N) 2*pi*rand(N,1);
 %% Ambient map on the sphere
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
 % linear ambient function
-a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
+% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
 % quadratic ambient ridge of rank(H) = r <= floor(m/2)
-% r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
+% r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
 % quadratic with preferential directions (my method is typically better)
-% H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
+H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
 % highly nonlinear ridge
 % a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
@@ -41,7 +41,7 @@ a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size
 
 %% Subpsace convergence study
 % convergence study values (NN and NT are amounts, N = 2.^NN and T = 0.5.^NT are upper bounds)
-NN = 2; NT = 1; nboot = 1;
+NN = 7; NT = 1; nboot = 1;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(1,NT,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(0.1.^Ti,NN*NT,1);
 % precondition metric vectors for convergence study

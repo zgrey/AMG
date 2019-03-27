@@ -119,7 +119,7 @@ end
 % convergence of differencing ladder
 N = 15; nrung=2.^linspace(0,N,N)'; err = ones(N,3); err_schilds = ones(N,1); err_ang = ones(N,1);
 % compute angle to check for isometry
-cost0 = v0*Vt'/(norm(v0)*norm(vt));
+cost0 = v0*Vt'/(norm(v0)*norm(Vt));
 for i=1:length(nrung)
     vp = diff_ladder(P0,P1,v0,Exp,Log,nrung(i));
     vp_s = schilds_ladder(P0,P1,v0,Exp,Log,nrung(i));
@@ -129,10 +129,11 @@ for i=1:length(nrung)
 end
 err = err(1:end-1,:) - repmat(err(end,:),length(nrung)-1,1);
 err = sqrt(err(:,1).^2 + err(:,2).^2 + err(:,3).^2);
-figure; loglog(nrung(1:end-1),err,'ko-'); grid on; hold on;
-loglog(nrung,err_schilds,'bo-');
-loglog(nrung,err_ang,'ro-');
-xlabel 'number of rungs'; ylabel 'error';
+figure; loglog(nrung,err_ang,'ko-','linewidth',2); grid on; hold on;
+set(0,'defaulttextInterpreter','latex')
+% loglog(nrung(1:end-1),err,'ko-');
+% loglog(nrung,err_schilds,'bo-');
+xlabel('number of rungs','fontsize',20); ylabel('error (preservation of angle)','fontsize',20);
 % compute subspace distance convergence rate
 M = [ones(length(nrung)-1,1) log10(nrung(1:end-1))]; cerr = M \ log10(err);
 % coefficient of determination for convergence estimate
