@@ -2,7 +2,7 @@
 clc;
 close all; cd ~/RESEARCH/SHDP/Shape_Subspace/
 clearvars;
-load turbine_airfoil.mat; i = 1;
+load turbine_airfoil.mat;
 
 %% parameter values
 rng(47);

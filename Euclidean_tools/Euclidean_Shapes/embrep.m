@@ -19,8 +19,6 @@
 %   ss - R^N vector of new uniformly distributed domain values
 %   vv - R^N vector of approximated embedding function values at entries of ss
 %   nn - R^(N-1) vector of unit normals
-
-% 
 function [vs,s,nemb,CC,k,ss,vv,nn,sarc] = embrep(C,N,t,A,B)
 
 %% determine nominal particle discrete embedding

@@ -66,7 +66,7 @@ a0 = P(:,1).*nu_emb(:,1) + P(:,2).*nu_emb(:,2);
 [t,ia] = unique(t,'stable');
 a0 = a0(ia); s0 = s0(ia);
 % construct radial embedding
-[ind,S,nu,S_emb,a_spl,s_spl,s,alpha,t]= radial_emb3_sort(s0,a0,t,N);
+[ind,S,nu,S_emb,a_spl,s_spl,s,alpha,t]= radial_emb3_sort(s0,a0,t,N,'curv');
 % count non-radially convex airfoils
 ind_emb(i) = sum(ind ~= 0);
 % save uniform discretization of inner product and angular distributions

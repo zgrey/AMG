@@ -33,5 +33,5 @@ figure(fig); hold on;
 xx=[x x]; yy=[y y]; zz=zeros(size(xx)); cc =[f f];
 
 % draw the surface
-h=surf(xx,yy,zz,cc,'EdgeColor','interp','FaceColor','none','linewidth',10) ;
+h=surf(xx,yy,zz,cc,'EdgeColor','interp','FaceColor','none','linewidth',8) ;
 colormap(parula); shading interp; view(2); colorbar; axis tight;

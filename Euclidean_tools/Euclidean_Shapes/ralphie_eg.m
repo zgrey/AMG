@@ -9,9 +9,9 @@ Rbnd = bwboundaries(~BW); bnd = Rbnd{3}*G; % use Rbnd{2}-inner or Rbnd{3}-outer
 bndsub = bnd(1:skp:end,:); N = size(bndsub,1);
 % shift and scale
 bndsub = 2*(bndsub - min(bndsub,[],1))./(max(bndsub,[],1)-min(bndsub,[],1)) - 1;
+x0 = [mean(bndsub(:,1)),mean(bndsub(:,2))]; bndsub = bndsub - x0;
 
 %% circular embedding
-x0 = [mean(bndsub(:,1)),mean(bndsub(:,2))]; bndsub = bndsub - x0;
 s0 = atan2(bndsub(:,2),bndsub(:,1)); angi = find(s0 < 0);
 s0(angi) = s0(angi) + 2*pi; s0 = s0/(2*pi);
 a0 = bndsub(:,1).*cos(2*pi*s0) + bndsub(:,2).*sin(2*pi*s0);
@@ -19,10 +19,13 @@ a0 = bndsub(:,1).*cos(2*pi*s0) + bndsub(:,2).*sin(2*pi*s0);
 [s0,ia] = unique(s0,'stable');
 a0 = a0(ia); Nu = length(s0);
 
+%% 3D circular embedding
+[PP3,n3] = embrep3(bndsub,NN,'uni'); 
+
 %% increasing nearest-neighbor sort
 lambda = 2; CW = 0;
-[ind,S,n,S_rc,pp] = radial_emb_sort(s0,a0,NN,lambda,CW);
-
+[ind,S,n,S_rc,pp] = radial_emb_sort(s0,a0,NN,lambda,CW,1,1);
+S = -S;
 %% Visualize shape
 fig = figure; hold on; axis equal;
 plot([bndsub(:,1);bndsub(1,1)],[bndsub(:,2);bndsub(1,2)],'k','linewidth',4,'Color',[0.929,0.694,0.125]);
@@ -32,6 +35,8 @@ scatter(bndsub(:,1),bndsub(:,2),'k');
 scatter(0,0,'filled','ko')
 scatter(S(ind,1),S(ind,2),'r.')
 axis equal; fig.CurrentAxes.Visible = 'off';
+% 3D circular embedding
+plot(PP3(:,1),PP3(:,2),'b--');
 
 %% GIF
 aaa = ppval(pp,linspace(0,1,NN)'); t  = linspace(0,max(aaa),100);
