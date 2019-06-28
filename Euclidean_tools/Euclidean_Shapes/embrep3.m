@@ -1,113 +1,163 @@
-%  N: integer number of landmarks
-% P0: matrix representation of shape landmarks
+function emb = embrep3(P0,N,smpl,varargin)
+%   P0: matrix representation of shape landmarks
+%    N: integer number of landmarks
+% smpl: sampling type ('uni' or 'curv')
 
-function [P_emb,nml,kappa,a_spl,th_spl,th0,a0,t,P_emb0,ind,tN] = embrep3(P0,N,smpl)
-% number of points
-n = size(P0,1);
-%% affine transformations
-% shift and scale to [-1,1] box
-% pu = max(P0,[],1)'; pl = min(P0,[],1)';
-% M = diag(2./(pu-pl)); b = -(M*pl + ones(2,1)); 
+% set default options
+opts = struct('ThetaSpline','complete',...
+              'AffineTrans','LA',...
+              'M',[],...
+              'b',[],...
+              'Minv',[]);
+          
+if ~isempty(varargin)
+    opts_custom = varargin{1};
+    all_fields = fieldnames(opts);
+    for field = fieldnames(opts_custom)'
+        tf_fieldmatch = strcmpi(all_fields, field);
+        if any(tf_fieldmatch)
+            opts = setfield(opts, all_fields{tf_fieldmatch}, getfield(opts_custom, field{:}));
+        else
+            error(['ERROR: Unexpected field name -> ' field])
+        end
+    end
+end
 
-% shift and scale using landmark-affine standardization (Bryner, 2D affine and projective spaces)
-% C_x = mean(P0,1)'; Sig_x = (P0 - repmat(C_x',n,1))'*(P0 - repmat(C_x',n,1));
-% M = chol(Sig_x) \ eye(2); b = -M*C_x;
-% % affine inverse (i.e., x0 = Minv*x + binv in [xl,xu]_m)
-% Minv = chol(Sig_x); binv = C_x;
+%% Affine transformations
+% nominal amount of provided landmark data
+emb.nom.num = size(P0,1);
 
-% shift and scale to center of mass
-% pu = max(P0,[],1)'; pl = min(P0,[],1)';
-% M = diag(2./(pu-pl));
-% b = -M*mean(P0,1)';
+% find unique points (very slow for large number of landmarks, currently limited by squareform)
+% [P,n] = unique_points(P0); emb.nom.unq_num = n; emb.nom.num = size(P0,1);
+% SPEED-UPS FOR CONVERGENCE STUDY:
+% if data has a known repeated last point (remove it for the transformation)
+P = P0(1:end-1,:); n = size(P0,1)-1;  emb.nom.unq_num = size(P0,1)-1;
+% if data does not have a repeated last point (repeat the first for periodicity, line 67)
+% P = P0; n = size(P0,1); emb.nom.unq_num = size(P0,1);
 
-% no transformation
-M = eye(2); b = [0;0]; Minv = eye(2); ainv = b;
+% compute affine transformations
+if strcmpi(opts.AffineTrans,'custom')
+    M = opts.M; b = opts.b; Minv = opts.Minv;
+else
+    [~,M,b,Minv] = affine_trans(P,opts.AffineTrans);
+end
 
 % transform points
-P = (P0*M + repmat(b',n,1));
-
-% repeat first point to close shape
+P = P*M' + repmat(b',n,1);
+P0 = P0*M' + repmat(b',emb.nom.num,1);
+% repeat first unique point to close shape (periodicity requirement for spline)
 P = [P;P(1,:)];
 
-%% embedding
-% compute discrete lengths
-t0 = cumsum([0; sqrt(( P(2:end,1) - P(1:end-1,1) ).^2 + ( P(2:end,2) - P(1:end-1,2) ).^2)],1);
-% compute unique angles using atan2
-s0 = atan2(P(:,2),P(:,1)); 
-s0 = unwrap(s0);
+% save transformation
+emb.TF.M = M; emb.TF.b = b; emb.TF.Minv = Minv; emb.TF.pts = P;
 
+%% Embedding representation
+% compute discrete lengths of non-repeated points
+t  = cumsum([0; sqrt(( P(2:end,1) - P(1:end-1,1) ).^2 + ( P(2:end,2) - P(1:end-1,2) ).^2)],1);
+t0 = cumsum([0; sqrt(( P0(2:end,1) - P0(1:end-1,1) ).^2 + ( P0(2:end,2) - P0(1:end-1,2) ).^2)],1);
+% compute unique angles using atan2 of original landmarks
+th = unwrap(atan2(P(:,2),P(:,1))); 
 % circular embedding
-nu_emb = [cos(s0) , sin(s0)];
+circ_nml = [cos(th) , sin(th)];
 % compute inner product
-a0 = P(:,1).*nu_emb(:,1) + P(:,2).*nu_emb(:,2);
-% take only unique points
-[t0,ia] = unique(t0,'stable');
-a0 = a0(ia); s0 = s0(ia);
+alph = P(:,1).*circ_nml(:,1) + P(:,2).*circ_nml(:,2);
 
-% sort based on increasing discrete length
-imgsort = sortrows([s0,a0,t0],3);
-th0 = imgsort(:,1); a0 = imgsort(:,2); t0 = imgsort(:,3);
+% save transformed landmark angle and inner product
+emb.TF.th = th; emb.TF.alph = alph;
 
 % scale length domain
-lb = min(t0); ub = max(t0);
-t = 1/(ub-lb)*t0;
+ub = max(t);
+emb.TF.t = t/ub; emb.nom.t = t0/ub;
 % chain rule scaling
-s_scl = 1/( (ub-lb) ); a_scl = 1/(ub-lb);
+emb.th.scl = 1/ub; emb.alph.scl = 1/ub;
 
 % build splines
+if strcmp(opts.ThetaSpline,'complete')
+    % match endslopes at endpoints of angular function
+    emb.th.spl = csape(emb.TF.t,emb.TF.th,'complete');
+elseif strcmp(opts.ThetaSpline,'pchip')
+    % respects strictly monotonic data
+    emb.th.spl = pchip(emb.TF.t,emb.TF.th);
+end
 % periodic spline of inner product
-a_spl = csape(t,a0,'periodic');
-% match first & second derivatives at endpoints of angular function
-th_spl = csape(t,th0,'complete');
+emb.alph.spl = csape(emb.TF.t,emb.TF.alph,'periodic');
 
-% find non-radially convex points
-ds = ppval(th_spl,t);
-ds = ds(2:end) - ds(1:end-1);
-ind = (ds <= 0);
-
-% evaluate shape at nominal landmarks
-P_emb0 =  [ppval(a_spl,t).*cos(ppval(th_spl,t)),...
-       ppval(a_spl,t).*sin(ppval(th_spl,t))];
-
+%% Sampling
 % reevaluate shape at N landmarks using embedding representation
 if strcmp(smpl,'curv')
     % compute continuous curvature approximation for refinement
-    tcurv =linspace(0,1,10000)';
-    da = a_scl*ppval(fnder(a_spl,1),tcurv); dda  = a_scl^2*ppval(fnder(a_spl,2),tcurv);
-    ds = s_scl*ppval(fnder(th_spl,1),tcurv); dds = s_scl^2*ppval(fnder(th_spl,2),tcurv);
-    num =  abs(-ppval(a_spl,tcurv).*dda.*ds + ppval(a_spl,tcurv).*da.*dds + 2*da.^2.*ds + ppval(a_spl,tcurv).^2.*ds.^3);
-    den = ( da.^2 + (ppval(a_spl,tcurv).^2).*(ds.^2)).^(3/2);
-    kappa = num./den;
+    tcurv = linspace(0,1,10000)';
+    emb.curv = cont_curv(tcurv,emb.th.spl,emb.alph.spl,emb.th.scl,emb.alph.scl,Minv);
 
-    % refine domain using curvature based importance sampling
-    ksum = cumsum(kappa); lb_k = min(ksum); ub_k = max(ksum);
+    % refine domain using curvature-based importance sampling
+    ksum = cumsum(emb.curv); lb_k = min(ksum); ub_k = max(ksum);
     tN = pchip(1/(ub_k - lb_k)*ksum,tcurv,linspace(0,1,N)');
 
 elseif strcmp(smpl,'uni')
-    % uniform sampling for refinement
-    tN = linspace(0,1,N)';
+    tN = linspace(0,1,10000)';
+    % evaluate shape at new N-landmarks
+    tmp_pts = [ppval(emb.alph.spl,tN).*cos(ppval(emb.th.spl,tN)), ...
+               ppval(emb.alph.spl,tN).*sin(ppval(emb.th.spl,tN))];
+    tmp_pts = (tmp_pts - repmat(b',length(tN),1))*Minv';
+    % compute discrete length over original scales
+    L = cumsum([0; sqrt(sum(( tmp_pts(2:end,:) - tmp_pts(1:end-1,:) ).^2,2))]);
+
+    % refine domain using length-based importance sampling
+    tN = pchip(1/max(L)*L,tN,linspace(0,1,N)');
+    
+elseif strcmp(smpl,'nom')
+    % evaluate shape at original measure
+    tmp_pts = (P - repmat(b',emb.nom.num,1))*Minv';
+    L = cumsum([0; sqrt(sum(( tmp_pts(2:end,:) - tmp_pts(1:end-1,:) ).^2,2))]);
+    
+    % refine domain using nominal length-based importance sampling
+    tN = pchip(1/max(L)*L,emb.TF.t,linspace(0,1,N)');
 end
 
+%% Evaluate shape characteristics
+% save total number of points
+emb.num = N;
+
 % compute continuous curvature at updated points 
-% derivatives of splines
-da = a_scl*ppval(fnder(a_spl,1),tN); dda  = a_scl^2*ppval(fnder(a_spl,2),tN);
-ds = s_scl*ppval(fnder(th_spl,1),tN); dds = s_scl^2*ppval(fnder(th_spl,2),tN);
-num =  abs(-ppval(a_spl,tN).*dda.*ds + ppval(a_spl,tN).*da.*dds + 2*da.^2.*ds + ppval(a_spl,tN).^2.*ds.^3);
-den = ( da.^2 + ppval(a_spl,tN).^2.*ds.^2).^(3/2);
-kappa = num./den;
+emb.curv = cont_curv(tN,emb.th.spl,emb.alph.spl,emb.th.scl,emb.alph.scl,emb.TF.Minv);
+emb.nom.curv = cont_curv(emb.nom.t,emb.th.spl,emb.alph.spl,emb.th.scl,emb.alph.scl,emb.TF.Minv);
 
 % compute continuous normal vector approximation
-nml  = a_scl*ppval(fnder(a_spl,1),tN).*([sin(ppval(th_spl,tN)), -cos(ppval(th_spl,tN))]) +...
-      s_scl*ppval(fnder(th_spl,1),tN).*[ppval(a_spl,tN).*cos(ppval(th_spl,tN)), ppval(a_spl,tN).*sin(ppval(th_spl,tN))];
+emb.nml     = emb.alph.scl*ppval(fnder(emb.alph.spl,1),tN).*([sin(ppval(emb.th.spl,tN)), -cos(ppval(emb.th.spl,tN))]) +...
+              emb.th.scl*ppval(fnder(emb.th.spl,1),tN).*[ppval(emb.alph.spl,tN).*cos(ppval(emb.th.spl,tN)), ...
+                                                         ppval(emb.alph.spl,tN).*sin(ppval(emb.th.spl,tN))];
+emb.nom.nml = emb.alph.scl*ppval(fnder(emb.alph.spl,1),emb.nom.t).*([sin(ppval(emb.th.spl,emb.nom.t)), -cos(ppval(emb.th.spl,emb.nom.t))]) +...
+              emb.th.scl*ppval(fnder(emb.th.spl,1),emb.nom.t).*[ppval(emb.alph.spl,emb.nom.t).*cos(ppval(emb.th.spl,emb.nom.t)), ppval(emb.alph.spl,emb.nom.t).*sin(ppval(emb.th.spl,emb.nom.t))];
+
+% evaluate shape at new N-landmarks
+emb.pts = [ppval(emb.alph.spl,tN).*cos(ppval(emb.th.spl,tN)), ...
+           ppval(emb.alph.spl,tN).*sin(ppval(emb.th.spl,tN))];
+
+% save evaluated length scales
+emb.t = tN;
+% save evaluations of inner products
+emb.nom.alph  = ppval(emb.alph.spl,emb.nom.t);
+% save evaluations of angle
+emb.nom.th    = ppval(emb.th.spl,emb.nom.t);
+
+%% Transform back to original coordinates
+% evaluate shape at nominal landmarks
+emb.nom.pts =  ([ppval(emb.alph.spl,emb.nom.t).*cos(ppval(emb.th.spl,emb.nom.t)),...
+                 ppval(emb.alph.spl,emb.nom.t).*sin(ppval(emb.th.spl,emb.nom.t))]...
+                 - repmat(emb.TF.b',length(emb.nom.t),1))*emb.TF.Minv';
+
+% transform scales back to original scale
+emb.pts = (emb.pts - repmat(emb.TF.b',N,1))*emb.TF.Minv';
+% compute discrete length from tesselation
+emb.L = cumsum([0; sqrt(sum(( emb.pts(2:end,:) - emb.pts(1:end-1,:) ).^2,2))]);
+emb.nom.L = cumsum([0; sqrt(sum(( emb.nom.pts(2:end,:) - emb.nom.pts(1:end-1,:) ).^2,2))]);
+% compute angles
+% emb.th.eval = unwrap(atan2(emb.pts(:,2),emb.pts(:,1))); 
+emb.th.eval = ppval(emb.th.spl,tN);
+% compute inner product
+% emb.alph.eval = emb.pts(:,1).*cos(emb.th.eval) + emb.pts(:,2).*sin(emb.th.eval);
+emb.alph.eval = ppval(emb.alph.spl,tN);
+
 % compute unit normals
-% nml = nml./sqrt(nml(:,1).^2 + nml(:,2).^2);
-
-% re-evaluate shape at new N-landmarks
-P_emb = [ppval(a_spl,tN).*cos(ppval(th_spl,tN)), ...
-         ppval(a_spl,tN).*sin(ppval(th_spl,tN))];
-
-%% transform back to original coordinates
-% shape landmarks
-P_emb = P_emb*Minv + repmat(ainv',N,1);
-% plot continuous approximation of normals
-nml = nml*[0 -1; 1 0]*Minv*[0 1; -1 0];
+emb.nml = emb.nml*[0 -1; 1 0]*Minv'*[0 1; -1 0];
+emb.nml = emb.nml./sqrt(emb.nml(:,1).^2 + emb.nml(:,2).^2);

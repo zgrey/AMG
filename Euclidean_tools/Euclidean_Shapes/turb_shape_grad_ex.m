@@ -1,16 +1,20 @@
 %% Wrapper for example shape gradient evaluations
-clc;
-close all; cd ~/RESEARCH/SHDP/Shape_Subspace/
-clearvars;
+clc; close all; clearvars; rng(42);
 load turbine_airfoil.mat;
+addpath ./Euclidean_tools/Euclidean_Shapes/
 
 %% parameter values
-rng(47);
 % t = 0;     % nominal
 % t = 0.005; % average-area preserving
 t = 0.01;  % area expanding
 N = 500; p = 3/2; M = 100; q = 15;
 A = (linspace(1,0,q).^p)'.*(2*rand(q,M)-1); B = (linspace(1,0,q).^p)'.*(2*rand(q,M)-1);
+
+%% nominal shape
+emb = embrep3(PP,N,'uni');
+% nominal shape resampled at N points
+PP0 = emb.pts;
+nu0 = emb.nml;
 
 %% turbine normalized field data
 NN = 100;
@@ -25,17 +29,12 @@ phi(:,3) = phi(:,3)/max(phi(:,3))*max(field(:,3));
 %% Loop shape perturbations
 PP_nuT = zeros(N,2,M); nuT = zeros(N,2,M); GM = zeros(N,M);
 for i=1:M
-    %% Approximate shape characteristics
-    % Turbine airfoil (load PP from turb_airfoil.mat before running...)
-    roti =1; ang = atan2(PP(roti,2),PP(roti,1)); ROT = @(ang) [cos(ang) -sin(ang); sin(ang) cos(ang)];
-    % nominal shape
-    [vs0,s0,nemb0,PP0,k0,ss0,vv0,nu0,sarc0] = embrep(PP*ROT(ang),N,0,A(:,i),B(:,i));
-    PP0 = PP0*ROT(-ang);
-    nu0 = nu0*ROT(-ang);
+
     % randomly perturbed shape
-    [vs,s,nemb,PP_nu,kappa,ss,vv,nu,sarc] = embrep(PP*ROT(ang),N,t,A(:,i),B(:,i));
-    PP_nu = PP_nu*ROT(-ang);
-    nu = nu*ROT(-ang);
+    emb = embpert3(emb,t,A(:,i),B(:,i),'expand');
+    PP_nu = emb.pert.pts;
+    nu = emb.pert.nml;
+    kappa = emb.pert.curv;
     
     % pick curvature filter
     % radial basis filter
@@ -43,11 +42,16 @@ for i=1:M
 %     kappa = (kappaRBF(:,2)-min(kappaRBF(:,2)))/(max(kappaRBF(:,2))-min(kappaRBF(:,2)))...
 %             *(max(kappa)-min(kappa))+min(kappa);
     % penalized
-    kappa = sqrt(kappa.^2)*0.001;
+    kappa = sqrt(kappa.^2)*0.1;
+
     %% Generate rbf scalar field
     [phiS,~,GphiS] = rbf_surf(PP_nu,w,mu,SS);
-    phiS(:,3) = phiS(:,3)/max(phiS(:,3))*max(field(:,3));
+    % DOUBLE CHECK THAT THIS QUANTITY CORRESPONDS TO LIFT
+%     phiS(:,3) = (phiS(:,3)/max(phiS(:,3))*max(field(:,3)) ).*emb.pert.nml(:,2);
+%     GphiS = GphiS.*[emb.pert.nml(:,2),emb.pert.nml(:,2)];
     
+    % just pressure
+    phiS(:,3) = (phiS(:,3)/max(phiS(:,3))*max(field(:,3)) );
     %% Gradient flow
     g  = sum(GphiS.*nu,2) + kappa.*phiS(:,3); 
     
@@ -58,7 +62,7 @@ for i=1:M
     
     if i==1
         %% Visualize shape characteristics
-        skp = 1; % quiver can get dense, adjust to skip some entries
+        skp = 1; % quiver can get congested, adjust to skip some entries
         fig = figure; hold on; axis equal;
         bndplot(fig,PP_nu(:,1),PP_nu(:,2),log(kappa));
         quiver(PP_nu(1:skp:end-1,1),PP_nu(1:skp:end-1,2),nu(1:skp:end-1,1),nu(1:skp:end-1,2));     

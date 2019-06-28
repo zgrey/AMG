@@ -12,16 +12,17 @@ maxi   = 20;    % max number of iterations
 % initial shape
 theta = linspace(0,2*pi,N)';
 % Schulz's initial shape
-c0 = 1/2*[cos(theta)-0.15*abs(1-sin(2*theta)).*cos(theta),sin(theta)-0.15*abs(1-cos(2*theta)).*cos(theta)];
+% c0 = 1/2*[cos(theta)-0.15*abs(1-sin(2*theta)).*cos(theta),sin(theta)-0.15*abs(1-cos(2*theta)).*cos(theta)];
 % circle
 % c0 = [cos(theta), sin(theta)];
 % tall ellipse
-% a = 1; b = 2; c0 =[a*cos(theta),b*sin(theta)];
+a = 1; b = 2; c0 =[a*cos(theta),b*sin(theta)];
 % Airfoil
 % load turbine_airfoil.mat; x0 = [mean(PP(:,1)),mean(PP(:,2))]; c0 = PP - x0;
 
 % plot nominal shape
-[c0,n0] = embrep3(c0,size(c0,1),'uni');
+emb = embrep3(c0,size(c0,1),'uni');
+c0 = emb.pts; n0 = emb.nml;
 h = plot(c0(:,1),c0(:,2),'o-'); axis equal; hold on; title 'Initial Shape'
 % throw out last repeated point
 c0 = c0(1:end-1,:); n0 = n0(1:end-1,:);
@@ -61,8 +62,7 @@ while norm(gradf) > 1e-5 && i <= maxi && d(c) > 1e-8
         R = -gradf./Hessf;
     elseif strcmp(method,'SD')
         % compute scalar-valued function for retraction map per steepest-descent
-        R = -gradf;
-        
+        R = -gradf;     
     end
     
     % exact line search
@@ -72,7 +72,8 @@ while norm(gradf) > 1e-5 && i <= maxi && d(c) > 1e-8
     c = c + a_opt(i)*R.*n;
     
     % recompute shape with uniform measure
-    [c,n] = embrep3(c,size(c,1)+1,'curv'); 
+    emb = embrep3(c,N,'uni'); 
+    c = emb.pts; n = emb.nml;
     % throw out last repeated point
     c = c(1:end-1,:); n = n(1:end-1,:);
     
