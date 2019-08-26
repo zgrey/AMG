@@ -28,10 +28,10 @@ end
 emb.nom.num = size(P0,1);
 
 % find unique points (very slow for large number of landmarks, currently limited by squareform)
-% [P,n] = unique_points(P0); emb.nom.unq_num = n; emb.nom.num = size(P0,1);
+[P,n] = unique_points(P0); emb.nom.unq_num = n; emb.nom.num = size(P0,1);
 % SPEED-UPS FOR CONVERGENCE STUDY:
 % if data has a known repeated last point (remove it for the transformation)
-P = P0(1:end-1,:); n = size(P0,1)-1;  emb.nom.unq_num = size(P0,1)-1;
+% P = P0(1:end-1,:); n = size(P0,1)-1;  emb.nom.unq_num = size(P0,1)-1;
 % if data does not have a repeated last point (repeat the first for periodicity, line 67)
 % P = P0; n = size(P0,1); emb.nom.unq_num = size(P0,1);
 

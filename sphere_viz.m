@@ -6,7 +6,9 @@ nmesh = 50; [XX,YY,ZZ] = sphere(nmesh);
 % parametrization of manifold (smooth immersion)
 X = @(S) [cos(S(:,1)).*sin(S(:,2)),sin(S(:,1)).*sin(S(:,2)),cos(S(:,2))]; 
 % Jacobian of sphere parametrization
-J = @(u,v) [-sin(u).*sin(v), cos(u).*cos(v); cos(u).*sin(v), sin(u).*cos(v); 0, -sin(v)];
+J = @(u,v) [-sin(u).*sin(v), cos(u).*cos(v);...
+             cos(u).*sin(v), sin(u).*cos(v); ...
+             0, -sin(v)];
 % exponential map
 Exp = @(t,Vt,P) kron(P,cos(t)) + kron(Vt./sqrt(sum(Vt.^2,2)),sin(t));
 % logarithmic map
