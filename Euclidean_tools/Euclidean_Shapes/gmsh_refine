@@ -1,0 +1,5 @@
+Merge "./airfoil.dat.geo";
+Mesh 2;
+RefineMesh;
+Save Sprintf("airfoil.mesh");
+

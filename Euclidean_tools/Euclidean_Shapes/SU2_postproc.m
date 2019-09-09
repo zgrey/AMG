@@ -5,14 +5,17 @@ clc; close all; clearvars;
 addpath ~/AMG/Euclidean_tools/Euclidean_Shapes/
 addpath ~/RESEARCH/SHDP/
 
+% datapath = '~/RESEARCH/SHDP/adjoints';
+datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/disc_adj/adjoints';
+
 % number of resampled points
-N = 1000; plt_flg = 0; msh_flg = 0; h = 5e-4;
+N = 1000; plt_flg = 0; msh_flg = 1; h = 5e-4;
 
 % smoothing bump function
 r = 100; c = 0.05; bump = @(t) exp(r)./( (exp(c*r) + exp(r*t)).*(exp(c*r) + exp(r*(1-t))) );
 
 %% read adjoint information from file
-dirstruct  = dir('~/RESEARCH/SHDP/adjoints');
+dirstruct  = dir(datapath);
 Naf = size(dirstruct,1)-2;
 H = zeros(N,2,Naf); Hproj = zeros(N,2,Naf); P = zeros(N,2,Naf);
 b = zeros(2,1,Naf); Minv = zeros(2,2,Naf); n = zeros(Naf,1);
@@ -39,7 +42,7 @@ for i=1:Naf
     %% compute perturbed embedding representation
     % perturbation using x-sens and y-sens
 %     P_pert = P0 + h*P_sens;
-    % perturbation using surface sensitivity assuming inward normal------s
+    % perturbation using surface sensitivity assuming inward normals
 %     P_sens = [surf_sens.*emb.nom.nml(:,1) surf_sens.*emb.nom.nml(:,2)]; P_pert = P0 - h*P_sens;
     
     % perturbation using penalized x-sens and y-sens
@@ -94,7 +97,7 @@ for i=1:Naf
     end
 end
 
-%% compute Karcher mean
+%% compute Kareshape(PTH0(:,2,:),N,Naf)rcher mean
 muP = P(:,:,1); V = ones(N,2); Log_P = zeros(N,2,Naf); iter = 0;
 disp('Computing Karcher mean...')
 disp('-----||V||_f History-----')
@@ -113,7 +116,7 @@ while norm(V,'fro') >= 1e-8 && iter < 1e4
     iter = iter + 1;
 end
 
-% convert to original average scales (using average, because why not)
+% convert to original average scales (using avera0.25ge, because why not)
 Minv_avg = sqrt(mean(n) - 1)*mean(Minv,3);
 muP0 = muP*Minv_avg'; 
 
@@ -133,14 +136,20 @@ for i=1:Naf
 end
 disp([num2str(toc),' sec.'])
 
+% independent SVD
 [AS1,Lambda1] = svd(reshape(PTH0(:,1,:),N,Naf));
 [AS2,Lambda2] = svd(reshape(PTH0(:,2,:),N,Naf));
 % aggregate important directions
 W = [AS1(:,1) AS2(:,1)];
 
+% correlated SVD
+[AS,Lambda] = svd([reshape(PTH0(:,1,:),N,Naf);...
+                   reshape(PTH0(:,2,:),N,Naf)]);
+W = reshape(AS(:,1),N,2); W = W./repmat([norm(W(:,1)), norm(W(:,2))],N,1);
+
 %% compute AMG
 Nt = 100;
-t = linspace(-0.25,0.25,Nt);[F] = readsu2_forces(dir('./forces'),3);
+t = linspace(-0.3,0.3,Nt);
 AMG = zeros(N,2,length(t)); AMG0 = AMG; mesh_fail = zeros(Nt,1);
 
 set(0,'defaulttextInterpreter','latex')
