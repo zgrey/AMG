@@ -2,7 +2,7 @@
 clc; close all; clearvars;
 
 %% Number of refined samples
-NN = 25;
+NN = 500;
 
 %% image processing
 skp = 4; Rim = imread('./ralphie.png');
@@ -40,7 +40,7 @@ plot(bndsub(:,1),bndsub(:,2),'ko','markersize',5);
 plot(emb.pts(:,1),emb.pts(:,2),'linewidth',1);
 % plot unit normals
 figure(1);
-quiver(emb.pts(:,1),emb.pts(:,2),emb.nml(:,1),emb.nml(:,2),1);
+quiver(emb.nom.pts(:,1),emb.nom.pts(:,2),emb.nom.nml(:,1),emb.nom.nml(:,2),1);
 axis equal; fig.CurrentAxes.Visible = 'off';
 
 % curvature

@@ -142,6 +142,9 @@ M = [ones(length(nrung)-1,1) log10(nrung(1:end-1))]; cerr = M \ log10(err);
 Rsq = 1 - sum((log10(err) - M*cerr).^2)/sum((log10(err) - mean(log10(err))).^2);
 fprintf('Differencing ladder convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 
+% Convergence of differencing schemes
+h = linspace(eps,1,100);
+
 %% Smooth 2-tensor study
 N = 400; [u,v] = meshgrid(linspace(0,2*pi,sqrt(N)),linspace(0,pi,sqrt(N)));
 S = reshape([u,v],N,2); P = X(S);
