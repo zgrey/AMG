@@ -6,9 +6,11 @@ addpath ~/AMG/Euclidean_tools/Euclidean_Shapes/
 addpath ~/RESEARCH/SHDP/
 
 % datapath = '~/RESEARCH/SHDP';
-datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj'; QOI  = 3;
+% datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj'; QOI  = 3;
+datapath = '~/RESEARCH/AMG_DATA/Cd_adj'; QOI = 3;
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cl_adj'; QOI = 2;
-sweepdata = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj/karcher';
+% sweepdata = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj/karcher';
+sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
 
 % number of resampled points
 N = 1000; % 1000 achieved BEST results (visually)
@@ -335,17 +337,15 @@ annotation('textbox', [0 0.9 1 0.1], ...
             'fontsize',16);
 
 %% AMG sweep
-Nt = 100;
+Nt = 100; t = linspace(-0.5,0.5,Nt);
 % PICK SUBSPACE:
 % dominant Parallel trans. AMG
 WAMG = reshape(AS(:,1),N,2);
 % second dominant Parallel trans. AMG
-% WAMG = reshape(AS(:,2),N,2); 
+% WAMG = reshape(AS(:,2),N,2); t = linspace(-0.2,0.2,Nt);
 % dominant embedded OPG projection
 % WAMG = embW;
 % WAMG = PGAW(:,:,1);
-
-t = linspace(-0.5,0.5,Nt);
 
 AMG = zeros(N,2,length(t)); AMG0 = AMG; mesh_fail = zeros(Nt,1);
 

@@ -31,15 +31,19 @@ cumd = cumsum(d);
 Nc = histc(L,cumd);
 
 fig = figure; gifname = 'Rnd_geo.gif';
-subplot(3,1,1), hd  = plot(cumd,ones(length(cumd),1),'o-','linewidth',2,'MarkerSize',10);
-hold on; axis tight;
+% subplot(3,1,1), hd  = plot(cumd,ones(length(cumd),1),'o-','linewidth',2,'MarkerSize',10);
+subplot(3,1,1), hd  = plot(cos(cumd/sum(d)*2*pi),sin(cumd/sum(d)*2*pi),'o','linewidth',2,'MarkerSize',10); hold on;
+subplot(3,1,1), plot(cos(linspace(0,2*pi,100)),sin(linspace(0,2*pi,100)),'linewidth',2,'MarkerSize',10,'color',hd.Color);
+hold on; axis tight; axis equal;
 for i=1:Nsmpl
     clc; disp([num2str(i),'/',num2str(Nsmpl),' walks complete']);
     t = linspace(0,1,Nc(i));
     
     % plot accumulating distance over Grassmannian
-    subplot(3,1,1), hg = plot(cumd(i),1,'go','linewidth',2,'MarkerSize',10);
-    subplot(3,1,1), hs = plot(cumd(i+1),1,'ro','linewidth',2,'MarkerSize',10);
+%     subplot(3,1,1), hg = plot(cumd(i),1,'go','linewidth',2,'MarkerSize',10);
+%     subplot(3,1,1), hs = plot(cumd(i+1),1,'ro','linewidth',2,'MarkerSize',10);
+    subplot(3,1,1), hg = plot(cos(cumd(i)/sum(d)*2*pi),sin(cumd(i)/sum(d)*2*pi),'go','linewidth',2,'MarkerSize',10);
+    subplot(3,1,1), hs = plot(cos(cumd(i+1)/sum(d)*2*pi),sin(cumd(i+1)/sum(d)*2*pi),'ro','linewidth',2,'MarkerSize',10);
     
     % plot nominal shapes
 %     P0geo = sqrt(n(i) - 1)*Pgeo(:,:,i)*Minv(:,:,subsmpl(i))';
@@ -63,8 +67,14 @@ for i=1:Nsmpl
         Sgeo = Gr_geo*Minv_avg';
 
         % visualize
-        subplot(3,1,1), hL1 = plot([0, cumd(i) + t(ii)*d(i+1)],[1,1],'k','linewidth',2);
-        subplot(3,1,1), hL2 = scatter(cumd(i) + t(ii)*d(i+1),1,100,'k','filled','linewidth',2);
+%         subplot(3,1,1), hL1 = plot([0, cumd(i) + t(ii)*d(i+1)],[1,1],'k','linewidth',2);
+%         subplot(3,1,1), hL2 = scatter(cumd(i) + t(ii)*d(i+1),1,100,'k','filled','linewidth',2);
+        tcirc = linspace(0,(cumd(i) + t(ii)*d(i+1))*2*pi/sum(d),100);
+        subplot(3,1,1), hL1 = plot(cos(tcirc),sin(tcirc),'k','linewidth',2);
+        tcirc = linspace(0,(cumd(i) + t(ii)*d(i+1))*2*pi/sum(d),100);
+        subplot(3,1,1), hL2 = scatter(cos((cumd(i) + t(ii)*d(i+1))*2*pi/sum(d)),...
+            sin((cumd(i) + t(ii)*d(i+1))*2*pi/sum(d)),100,'k','filled','linewidth',2);
+        
         fig.CurrentAxes.Visible = 'off';
         subplot(3,1,2), hGr = plot(Gr_geo(:,1),Gr_geo(:,2),'k','linewidth',2); hold on; axis equal;
         fig.CurrentAxes.Visible = 'off';
