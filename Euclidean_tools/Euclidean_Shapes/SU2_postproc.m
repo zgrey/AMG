@@ -7,10 +7,11 @@ addpath ~/RESEARCH/SHDP/
 
 % datapath = '~/RESEARCH/SHDP';
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj'; QOI  = 3;
-datapath = '~/RESEARCH/AMG_DATA/Cd_adj'; QOI = 3;
+% datapath = '~/RESEARCH/AMG_DATA/Cd_adj'; QOI = 3;
+datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3;
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cl_adj'; QOI = 2;
 % sweepdata = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj/karcher';
-sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
+% sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
 
 % number of resampled points
 N = 1000; % 1000 achieved BEST results (visually)
@@ -24,7 +25,8 @@ h = 1e-4; % 1e-4 achieved BEST results (visually)
 smth = 1;
 
 % pick ranks
-rAS = 1000; rPGA = 4;
+% rAS = 1000; rPGA = 4;
+rAS = 50; rPGA = 4;
 
 % pick central design
 cnt_dsn = 'karcher';
@@ -53,7 +55,12 @@ for i=1:Naf
     clc; disp([num2str(i),'/',num2str(Naf),' Shapes Complete']);
     % read adjoints
     data = csvread([dir_adj(2+i).folder,'/',dir_adj(2+i).name],1,0);
-    Idum = strfind(dir_adj(2+i).name,'_'); Iadj(i) = str2double(dir_adj(2+i).name(Idum(1)+1:Idum(2)-1));
+    Idum = strfind(dir_adj(2+i).name,'_'); 
+    
+    % first naming convention
+%     Iadj(i) = str2double(dir_adj(2+i).name(Idum(1)+1:Idum(2)-1));
+    % simple naming convention
+    Idum2 = strfind(dir_adj(2+i).name,'.'); Iadj(i) = str2double(dir_adj(2+i).name(Idum(1)+1:Idum2-1));
     % remove known LE and TE points reported as first two lines
     data_new = data(3:end,:);  
     % surface sensitivities
@@ -351,7 +358,7 @@ AMG = zeros(N,2,length(t)); AMG0 = AMG; mesh_fail = zeros(Nt,1);
 
 set(0,'defaulttextInterpreter','latex')
 fig = figure; gifname = './AMG.gif';
-for i=1:length(t)
+for i=20:length(t)
     AMG(:,:,i)  = Gr_exp(t(i),muP,WAMG);
     
     % rescale and center
