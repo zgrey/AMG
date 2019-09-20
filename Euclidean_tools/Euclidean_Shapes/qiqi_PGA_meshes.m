@@ -5,7 +5,7 @@ clc; close all; clearvars; rng(42);
 addpath ~/AMG/Euclidean_tools/Euclidean_Shapes/;
 addpath ~/RESEARCH/SHDP/;
 
-plt_flg = 1; msh_flg = 1;
+plt_flg = 0; msh_flg = 0;
 % things to modify
 Nldmk = 1000; Nrnd = 1000; rPGA = 10; tub = 1.5; tlb = -1.5;
 
@@ -40,7 +40,7 @@ for i=1:Naf
     [Pemb,M(:,:,i),b(:,:,i),Minv(:,:,i)] = affine_trans(emb.pts,'LA'); P(:,:,i) = 1/sqrt(Nldmk-1)*Pemb;
 end
 
-%% compute Karcher mean
+%% compute Karcher mean of affine-standardized shapes
 muP = P(:,:,1); V = ones(Nldmk,2); Log_P = zeros(Nldmk,2,Naf); iter = 0;
 disp('Computing Karcher mean...')
 disp('-----||V||_f History-----')
@@ -59,9 +59,22 @@ while norm(V,'fro') >= 1e-8 && iter <= 5
     iter = iter + 1;
 end
 
-% convert to original average scales (using average... because why not...)
-Minv_avg = sqrt(Nldmk - 1)*mean(Minv,3);
-muP0 = muP*Minv_avg';
+% build section to original average scales (using average... because why not...)
+proj_inv = sqrt(Nldmk - 1)*mean(Minv,3);
+% build section to original scales using Karcher mean
+V = proj_inv;
+while norm(V,'fro') >= 1e-8 && iter <= 5
+    tic; sum_log = 0;
+    for i=1:Naf
+        sum_log = logm(M(:,:,i)*V) + sum_log;
+    end
+    V = V - 1/Naf*V*sum_log;
+    muP = Gr_exp(1,muP,V);
+    disp(['||V||_f = ',num2str(norm(V,'fro')),' ... ',num2str(toc),' sec.']);
+    iter = iter + 1;
+end
+
+muP0 = muP*proj_inv';
 
 %% PGA
 disp('Computing PGA...')
@@ -93,7 +106,7 @@ for i=1:Nrnd
     % transform to scaled airfoil
     Vrnd = reshape((PGA(:,1:rPGA)*PGAeigs(1:rPGA,1:rPGA))*trnd(i,:)',Nldmk,2);
     Gr_Pts(:,:,i) = Gr_exp(1,muP,Vrnd);
-    pts = Gr_Pts(:,:,i)*Minv_avg';
+    pts = Gr_Pts(:,:,i)*proj_inv';
     
     % shift to center in mesh a bit
     Pts(:,:,i) = pts;
