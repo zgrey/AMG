@@ -8,8 +8,10 @@ addpath ~/RESEARCH/SHDP/
 % datapath = '~/RESEARCH/SHDP';
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj'; QOI  = 3;
 % datapath = '~/RESEARCH/AMG_DATA/Cd_adj'; QOI = 3;
-datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3; load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg');
+datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3;
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cl_adj'; QOI = 2;
+
+load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg');
 
 % sweepdata = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj/karcher';
 % sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
@@ -28,7 +30,7 @@ smth = 1;
 
 % pick ranks
 % rAS = 1000; rPGA = 4;
-rAS = 20; rPGA = 4;
+rAS = 400; rPGA = 4;
 
 % pick central design
 cnt_dsn = 'karcher';
@@ -91,8 +93,8 @@ for i=1:Naf
     emb_pert_bwd = embrep3(P_pert_bwd,N,'uni',opts);
     emb_pert_fwd = embrep3(P_pert_fwd,N,'uni',opts);
     % Affine-standardize perturbations (BEST!!!!!! same as simple SVD until the 5th airfoil????)
-    P_h_fwd = affine_trans(emb_pert_fwd.pts,'LA'); P_h_fwd = 1/sqrt(N-1)*P_h_fwd;
-    P_h_bwd = affine_trans(emb_pert_bwd.pts,'LA'); P_h_bwd = 1/sqrt(N-1)*P_h_bwd;
+%     P_h_fwd = affine_trans(emb_pert_fwd.pts,'LA'); P_h_fwd = 1/sqrt(N-1)*P_h_fwd;
+%     P_h_bwd = affine_trans(emb_pert_bwd.pts,'LA'); P_h_bwd = 1/sqrt(N-1)*P_h_bwd;
     % Affine-standardize perturbations using simple SVD
 %     [P_h_fwd,~] = svd(emb_pert_fwd.pts - repmat(mean(emb_pert_fwd.pts,1),N,1),'econ');
 %     [P_h_bwd,~] = svd(emb_pert_bwd.pts - repmat(mean(emb_pert_bwd.pts,1),N,1),'econ');
@@ -100,8 +102,8 @@ for i=1:Naf
 %     [P_h_fwd,~] = svd(emb_pert_fwd.pts*M(:,:,i)' + repmat(b(:,:,i)',N,1),'econ');
 %     [P_h_bwd,~] = svd(emb_pert_fwd.pts*M(:,:,i)' + repmat(b(:,:,i)',N,1),'econ');
     % transform perturbed points using unperturbed transform [Absil et al., Prop. 3.1]
-%     P_h_bwd = 1/sqrt(N-1)*(emb_pert_bwd.pts*M(:,:,i)' + repmat(b(:,:,i)',N,1));
-%     P_h_fwd = 1/sqrt(N-1)*(emb_pert_fwd.pts*M(:,:,i)' + repmat(b(:,:,i)',N,1));        
+    P_h_bwd = 1/sqrt(N-1)*(emb_pert_bwd.pts*M(:,:,i)' + repmat(b(:,:,i)',N,1));
+    P_h_fwd = 1/sqrt(N-1)*(emb_pert_fwd.pts*M(:,:,i)' + repmat(b(:,:,i)',N,1));        
     
     %% compute shape sensitivity as Grassmannian gradient  
     % Taylor series approximation of gradient
@@ -112,8 +114,8 @@ for i=1:Naf
     % STRANGER LOOKING AMG PERTURBATIONS
 %     H(:,:,i) = 1/(2*h)*(Gr_log(P(:,:,i),P_h_fwd) - Gr_log(P(:,:,i),P_h_bwd));
     % projection based gradient (THESE APPEAR QUITE NOISY, particularly at the LE)
-%      P_pert_spl1 = csape(emb.nom.t,P_sens(:,1),'periodic'); P_pert_spl2 = csape(emb.nom.t,P_sens(:,2),'periodic');  
-%      Hproj(:,:,i) = (eye(N) - P(:,:,i)*P(:,:,i)')*[bump(emb.t).*ppval(P_pert_spl1,emb.t) bump(emb.t).*ppval(P_pert_spl2,emb.t)];
+     P_pert_spl1 = csape(emb.nom.t,P_sens(:,1),'periodic'); P_pert_spl2 = csape(emb.nom.t,P_sens(:,2),'periodic');  
+     Hproj(:,:,i) = (eye(N) - P(:,:,i)*P(:,:,i)')*[bump(emb.t).*ppval(P_pert_spl1,emb.t) bump(emb.t).*ppval(P_pert_spl2,emb.t)];
 %     H(:,:,i) = Hproj(:,:,i);
      
     tan_err(i) = norm((eye(N) - P(:,:,i)*P(:,:,i)')*H(:,:,i) - H(:,:,i),'fro');
@@ -184,6 +186,7 @@ if strcmp(cnt_dsn,'karcher')
 
     % convert to original average scales (using average... because why not...)
     if ~exist('Minv_avg','var')
+        disp('Computing inverse affine transformation for local section...');
         Minv_avg = sqrt(N - 1)*mean(Minv,3);
     end
     muP0 = muP*Minv_avg'; 
@@ -243,14 +246,15 @@ disp([num2str(toc),' sec.'])
 [AS,Eigs] = svd(1/sqrt(Naf)*[reshape(PTH0(:,1,:),N,Naf);...
                    reshape(PTH0(:,2,:),N,Naf)]);
 W = reshape(AS(:,1),N,2);
+W1 = reshape(AS(:,1),N,2); W2 = reshape(AS(:,2),N,2);
 
 % embedded OPG [Mukherjee]
 [embAS,embEigs] = svd(1/sqrt(Naf)*[reshape(H(:,1,:),N,Naf);...
                    reshape(H(:,2,:),N,Naf)]);
-embW = reshape(embAS(:,1),N,2);
+embW1 = reshape(embAS(:,1),N,2); embW2 = reshape(embAS(:,2),N,2);
 % project to central tangent space
-embW = (eye(N) - muP*muP')*embW;
-disp(['Norm difference of emb. and Par. Trans. basis = ',num2str(norm(embW - W,'fro'))])
+embW1 = (eye(N) - muP*muP')*embW1;
+disp(['Norm difference of emb. and Par. Trans. basis = ',num2str(norm(embW1 - W,'fro'))])
 
 % PGA
 [PGA,PGAeigs] = svd(1/sqrt(Naf)*U);
@@ -261,11 +265,11 @@ disp('Checking to see if AS basis is in horizontal space...')
 disp(['Projection error = ',num2str(norm((eye(N) - muP*muP')*W - W,'fro'))])
 
 % perturb small amount forward along AMG
-AMG_fwd = Gr_exp(0.25,muP,W);
-AMG_fwd0 = AMG_fwd*Minv_avg';
+AMG_fwd1 = Gr_exp(0.2,muP,W1); AMG_fwd2 = Gr_exp(0.1,muP,W2);
+AMG0_fwd1 = AMG_fwd1*Minv_avg'; AMG0_fwd2 = AMG_fwd2*Minv_avg';
 % perturb small amount forward along emb. OPG
-embAMG_fwd = Gr_exp(0.25,muP,embW);
-embAMG_fwd0 = embAMG_fwd*Minv_avg';
+embAMG_fwd1 = Gr_exp(0.2,muP,embW1); embAMG_fwd2 = Gr_exp(0.1,muP,embW2); 
+embAMG0_fwd1 = embAMG_fwd1*Minv_avg'; embAMG0_fwd2 = embAMG_fwd2*Minv_avg';
 % perturb small amount along PGA
 PGA_fwd = zeros(N,2,rPGA);
 for i=1:size(PGAW,3), PGA_fwd(:,:,i) = Gr_exp(0.1,muP,PGAW(:,:,i)); end
@@ -283,23 +287,23 @@ xlabel('$$index$$'); title('$$PGA \,\, Eigenvalues$$');
 
 % visualize eigenvectors
 % quiver subset parameter
+% first eigenvector
 sub = 10; 
-
 fig = figure;
 % forward AMG
 subplot(2,1,1), bndplot(fig,muP(:,1),muP(:,2),sqrt(W(:,1).^2 + W(:,2).^2)); axis equal; hold on;
 subplot(2,1,1), plot(muP(:,1),muP(:,2),'w','linewidth',2); 
-subplot(2,1,1), plot(AMG_fwd(:,1),AMG_fwd(:,2),'k','linewidth',2);
+subplot(2,1,1), plot(AMG_fwd1(:,1),AMG_fwd1(:,2),'k','linewidth',2);
 subplot(2,1,1), quiver(muP(1:sub:end,1),muP(1:sub:end,2),W(1:sub:end,1),W(1:sub:end,2),1,'k');
-subplot(2,1,1), embh = plot(embAMG_fwd(:,1),embAMG_fwd(:,2),'r--','linewidth',2);
+subplot(2,1,1), embh = plot(embAMG_fwd1(:,1),embAMG_fwd1(:,2),'r--','linewidth',2);
 fig.CurrentAxes.Visible = 'off';
 
 % forward AMG over physical shape
 subplot(2,1,2), bndplot(fig,muP0(:,1),muP0(:,2),sqrt(W(:,1).^2 + W(:,2).^2)); 
 axis equal; hold on; colorbar off;
 subplot(2,1,2), plot(muP0(:,1),muP0(:,2),'w','linewidth',2); 
-subplot(2,1,2), plot(AMG_fwd0(:,1),AMG_fwd0(:,2),'k','linewidth',2);
-subplot(2,1,2), plot(embAMG_fwd0(:,1),embAMG_fwd0(:,2),'--','color',embh.Color,'linewidth',2);
+subplot(2,1,2), plot(AMG0_fwd1(:,1),AMG0_fwd1(:,2),'k','linewidth',2);
+subplot(2,1,2), plot(embAMG0_fwd1(:,1),embAMG0_fwd1(:,2),'--','color',embh.Color,'linewidth',2);
 fig.CurrentAxes.Visible = 'off';
 
 annotation('textbox', [0 0.9 1 0.1], ...
@@ -308,7 +312,31 @@ annotation('textbox', [0 0.9 1 0.1], ...
             'HorizontalAlignment', 'center', ...Nt = 100;
             'interpreter','latex', ...
             'fontsize',16);
+fig = figure;
+% second eigenvector
+% forward AMG
+subplot(2,1,1), bndplot(fig,muP(:,1),muP(:,2),sqrt(W2(:,1).^2 + W2(:,2).^2)); axis equal; hold on;
+subplot(2,1,1), plot(muP(:,1),muP(:,2),'w','linewidth',2); 
+subplot(2,1,1), plot(AMG_fwd2(:,1),AMG_fwd2(:,2),'k','linewidth',2);
+subplot(2,1,1), quiver(muP(1:sub:end,1),muP(1:sub:end,2),W2(1:sub:end,1),W2(1:sub:end,2),1,'k');
+subplot(2,1,1), embh = plot(embAMG_fwd2(:,1),embAMG_fwd2(:,2),'r--','linewidth',2);
+fig.CurrentAxes.Visible = 'off';
 
+% forward AMG over physical shape
+subplot(2,1,2), bndplot(fig,muP0(:,1),muP0(:,2),sqrt(W2(:,1).^2 + W2(:,2).^2)); 
+axis equal; hold on; colorbar off;
+subplot(2,1,2), plot(muP0(:,1),muP0(:,2),'w','linewidth',2); 
+subplot(2,1,2), plot(AMG0_fwd2(:,1),AMG0_fwd2(:,2),'k','linewidth',2);
+subplot(2,1,2), plot(embAMG0_fwd2(:,1),embAMG0_fwd2(:,2),'--','color',embh.Color,'linewidth',2);
+fig.CurrentAxes.Visible = 'off';
+
+annotation('textbox', [0 0.9 1 0.1], ...
+            'String', '$$2^{nd}\,\,Eigenvector$$', ...
+            'EdgeColor', 'none', ...
+            'HorizontalAlignment', 'center', ...Nt = 100;
+            'interpreter','latex', ...
+            'fontsize',16);
+        
 % PGA modes
 fig = figure;
 for i=1:rPGA
@@ -350,7 +378,6 @@ annotation('textbox', [0 0.9 1 0.1], ...
             'fontsize',16);
 
 % "project" to AMG
-W1 = reshape(AS(:,1),N,2); W2 = reshape(AS(:,2),N,2);
 tproj = zeros(Naf,2);
 disp('Optimizing to compute projections...')
 tic;
@@ -367,12 +394,12 @@ t2 = linspace(min(tproj*Utprj(:,1)),max(tproj*Utprj(:,1)),100);
 t2sweep = t2'*Utprj(:,1)';
 
 %% 1st principal AMG sweep
-Nt = 100; t = linspace(-0.25,0.25,Nt);
+Nt = 100; t = linspace(-0.5,0.5,Nt);
 % PICK SUBSPACE:
 % dominant Parallel trans. AMG
-% WAMG = reshape(AS(:,1),N,2);
+WAMG = reshape(AS(:,1),N,2);
 % correlated 2d Parallel trans. AMG
-WAMG = W1.*Utprj(1,1) + W2.*Utprj(2,1);
+% WAMG = W1.*Utprj(1,1) + W2.*Utprj(2,1); t = t2;
 % second dominant Parallel trans. AMG
 % WAMG = reshape(AS(:,2),N,2); t = linspace(-0.2,0.2,Nt);
 % dominant embedded OPG projection

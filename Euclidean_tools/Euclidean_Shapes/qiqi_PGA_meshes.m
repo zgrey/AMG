@@ -60,21 +60,21 @@ while norm(V,'fro') >= 1e-8 && iter <= 5
 end
 
 % build section to original average scales (using average... because why not...)
-proj_inv = sqrt(Nldmk - 1)*mean(Minv,3);
+proj_inv = sqrt(Nldmk - 1)*mean(Minv,3); 
 % build section to original scales using Karcher mean
-V = proj_inv;
+V = proj_inv; iter = 0; muM = eye(2);
 while norm(V,'fro') >= 1e-8 && iter <= 5
     tic; sum_log = 0;
     for i=1:Naf
         sum_log = logm(M(:,:,i)*V) + sum_log;
     end
     V = V - 1/Naf*V*sum_log;
-    muP = Gr_exp(1,muP,V);
+    muM = Gr_exp(1,muM,V);
     disp(['||V||_f = ',num2str(norm(V,'fro')),' ... ',num2str(toc),' sec.']);
     iter = iter + 1;
 end
 
-muP0 = muP*proj_inv';
+muP0 = muP / muM';
 
 %% PGA
 disp('Computing PGA...')
