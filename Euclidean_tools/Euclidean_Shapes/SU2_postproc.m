@@ -8,10 +8,12 @@ addpath ~/RESEARCH/SHDP/
 % datapath = '~/RESEARCH/SHDP';
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj'; QOI  = 3;
 % datapath = '~/RESEARCH/AMG_DATA/Cd_adj'; QOI = 3;
-datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3;
+datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3; load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg');
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cl_adj'; QOI = 2;
+
 % sweepdata = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj/karcher';
 % sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
+sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher';
 
 % number of resampled points
 N = 1000; % 1000 achieved BEST results (visually)
@@ -26,7 +28,7 @@ smth = 1;
 
 % pick ranks
 % rAS = 1000; rPGA = 4;
-rAS = 50; rPGA = 4;
+rAS = 20; rPGA = 4;
 
 % pick central design
 cnt_dsn = 'karcher';
@@ -181,7 +183,9 @@ if strcmp(cnt_dsn,'karcher')
     end
 
     % convert to original average scales (using average... because why not...)
-    Minv_avg = sqrt(N - 1)*mean(Minv,3);
+    if ~exist('Minv_avg','var')
+        Minv_avg = sqrt(N - 1)*mean(Minv,3);
+    end
     muP0 = muP*Minv_avg'; 
 
 elseif strcmp(cnt_dsn,'drag_opt_0AOA')
@@ -207,9 +211,11 @@ elseif strcmp(cnt_dsn,'drag_opt_-1.25AOA')
     Minv_avg = sqrt(N-1)*muemb.TF.Minv;
 end
 
-figure;
-subplot(1,2,1), plot(muP0(:,1),muP0(:,2),'linewidth',2); axis equal; hold on;
-subplot(1,2,2), plot(muP(:,1),muP(:,2),'linewidth',2); axis equal; hold on;
+fig = figure;
+subplot(1,2,1), plot(muP0(:,1),muP0(:,2),'k','linewidth',2); axis equal; hold on;
+fig.CurrentAxes.Visible = 'off';
+subplot(1,2,2), plot(muP(:,1),muP(:,2),'k','linewidth',2); axis equal; hold on;
+fig.CurrentAxes.Visible = 'off';
 
 %% Subspace computations (Parallel Trans. OPG, Embedded OPG, and PGA)
 PTH0 = zeros(N,2,Naf); avgOPG = zeros(2*N); embOPG = zeros(2*N); U = zeros(2*N,Naf);
@@ -267,8 +273,8 @@ for i=1:size(PGAW,3), PGA_fwd(:,:,i) = Gr_exp(0.1,muP,PGAW(:,:,i)); end
 %% Visualize subspace computations
 % visualize eigenvalues
 figure; 
-subplot(1,2,1), scatter(1:rAS,diag(Eigs(1:rAS,1:rAS))); hold on;
-subplot(1,2,1), scatter(1:rAS,diag(embEigs(1:rAS,1:rAS)),15,'filled');
+subplot(1,2,1), scatter(1:Naf,diag(Eigs(1:Naf,1:Naf))); hold on;
+subplot(1,2,1), scatter(1:Naf,diag(embEigs(1:Naf,1:Naf)),15,'filled');
 set(gca, 'YScale', 'log'); grid on; legend('AMG','Emb. OPG');
 xlabel('$$index$$'); title('$$AMG \,\, Eigenvalues$$');
 subplot(1,2,2), scatter(1:min([2*N,Naf]),diag(PGAeigs)); hold on;
@@ -343,11 +349,30 @@ annotation('textbox', [0 0.9 1 0.1], ...
             'interpreter','latex', ...
             'fontsize',16);
 
-%% AMG sweep
-Nt = 100; t = linspace(-0.5,0.5,Nt);
+% "project" to AMG
+W1 = reshape(AS(:,1),N,2); W2 = reshape(AS(:,2),N,2);
+tproj = zeros(Naf,2);
+disp('Optimizing to compute projections...')
+tic;
+for i=1:Naf
+    tic;
+    tproj(Iadj(i),1) = fminbnd(@(t) dGr_np(Gr_exp(t,muP,W1),P(:,:,i)),-2,2);
+    tproj(Iadj(i),2) = fminbnd(@(t) dGr_np(Gr_exp(t,muP,W2),P(:,:,i)),-2,2);
+end
+disp(['... finished in ',num2str(toc),' sec.']);
+
+% build correlated sweep from concentrated measure
+[Utprj,~] = svd(tproj','econ');
+t2 = linspace(min(tproj*Utprj(:,1)),max(tproj*Utprj(:,1)),100);
+t2sweep = t2'*Utprj(:,1)';
+
+%% 1st principal AMG sweep
+Nt = 100; t = linspace(-0.25,0.25,Nt);
 % PICK SUBSPACE:
 % dominant Parallel trans. AMG
-WAMG = reshape(AS(:,1),N,2);
+% WAMG = reshape(AS(:,1),N,2);
+% correlated 2d Parallel trans. AMG
+WAMG = W1.*Utprj(1,1) + W2.*Utprj(2,1);
 % second dominant Parallel trans. AMG
 % WAMG = reshape(AS(:,2),N,2); t = linspace(-0.2,0.2,Nt);
 % dominant embedded OPG projection
@@ -358,7 +383,7 @@ AMG = zeros(N,2,length(t)); AMG0 = AMG; mesh_fail = zeros(Nt,1);
 
 set(0,'defaulttextInterpreter','latex')
 fig = figure; gifname = './AMG.gif';
-for i=20:length(t)
+for i=1:length(t)
     AMG(:,:,i)  = Gr_exp(t(i),muP,WAMG);
     
     % rescale and center
@@ -417,8 +442,6 @@ for i=20:length(t)
 end
 
 %% AMG shadows
-% shadow over AMG
-W1 = reshape(AS(:,1),N,2); W2 = reshape(AS(:,2),N,2);
 % shadow over PGA
 % W1 = reshape(PGA(:,1),N,2); W2 = reshape(PGA(:,2),N,2);
 
@@ -432,17 +455,6 @@ elseif QOI == 2
     [Frnd,~,Iforces] = readsu2_forces(dir_force,QOI);
     ylbl = '$$C_{\ell}$$';
 end
-
-% "project" to AMG
-tproj = zeros(Naf,2);
-disp('Optimizing to compute projections...')
-tic;
-for i=1:Naf
-    tic;
-    tproj(Iadj(i),1) = fminbnd(@(t) dGr_np(Gr_exp(t,muP,W1),P(:,:,i)),-2,2);
-    tproj(Iadj(i),2) = fminbnd(@(t) dGr_np(Gr_exp(t,muP,W2),P(:,:,i)),-2,2);
-end
-disp(['... finished in ',num2str(toc),' sec.']);
 
 % scatter plots along AMG
 figure; set(0,'defaulttextInterpreter','latex')
@@ -464,12 +476,15 @@ if exist([sweepdata,'/forces/airfoil_1.su2.dat'],'file')
     end
     subplot(1,2,1), scatter(t,Fsweep,50,'filled','cdata',Fsweep);
     subplot(1,2,1), plot(t,Fsweep,'k','linewidth',2);
+    
     % plot warnings
     scatter(t(WARN),Fsweep(WARN),200,'rx','linewidth',2)
 end
-subplot(1,2,2), scatter(tproj(Iforces,1),tproj(Iforces,2),50,'filled','cdata',Frnd(Iforces)); colorbar;
-
+subplot(1,2,2), scatter(tproj(Iforces,1),tproj(Iforces,2),50,'filled','cdata',Frnd(Iforces)); colorbar; hold on;
+subplot(1,2,2), scatter(t,zeros(Nt,1),50,'filled','cdata',Fsweep);
+% plot warnings
+subplot(1,2,2), scatter(t(WARN),zeros(length(t(WARN)),1),200,'rx','linewidth',2)
 %% save data
-% close all;
+close all;
 clearvars sweepdata
 save([datapath,'/',cnt_dsn,'/AMG_postproc.mat']);
