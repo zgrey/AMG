@@ -11,11 +11,13 @@ addpath ~/RESEARCH/SHDP/
 datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3;
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cl_adj'; QOI = 2;
 
-load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg');
+load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg','PGA','rPGA');
 
 % sweepdata = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj/karcher';
 % sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
-sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher';
+% sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher';
+
+sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher/PGA_basis';
 
 % number of resampled points
 N = 1000; % 1000 achieved BEST results (visually)
@@ -30,7 +32,7 @@ smth = 1;
 
 % pick ranks
 % rAS = 1000; rPGA = 4;
-rAS = 400; rPGA = 4;
+rAS = 400;
 
 % pick central design
 cnt_dsn = 'karcher';
@@ -125,34 +127,38 @@ for i=1:Naf
     end
     %% Visualize airfoils
     if plt_flg == 1
-        figure;
-        % plot continuous approximation of shape
-        subplot(1,2,1), h1 = plot(emb.pts(:,1),emb.pts(:,2),'linewidth',2); axis equal; hold on;
-        subplot(1,2,1), h2 = quiver(emb.nom.pts(:,1),emb.nom.pts(:,2),P_sens(:,1),P_sens(:,2),1,'color',h1.Color);
-        subplot(1,2,1), h1p = plot(emb_pert_fwd.pts(:,1),emb_pert_fwd.pts(:,2),'k'); axis equal; hold on;
-
-        % plot original airfoil
-        subplot(1,2,1), h3 = scatter(P0(:,1),P0(:,2),30,'filled','cdata',surf_sens);
-        subplot(1,2,1), h3pbwd = scatter(P_pert_bwd(:,1),P_pert_bwd(:,2),15,'k.');
-        subplot(1,2,1), h3pfwd = scatter(P_pert_fwd(:,1),P_pert_fwd(:,2),15,'k.');
+        fig = figure;
+        % plot surface sensitivity
+        bndplot(fig,emb.nom.pts(:,1),emb.nom.pts(:,2),log(sqrt(sum(P_sens.^2,2))));
+        h1 = plot(emb.pts(:,1),emb.pts(:,2),'w','linewidth',2); axis equal; hold on; 
+%         subplot(2,1,1), h3 = scatter(P0(:,1),P0(:,2),20,'filled','cdata',sqrt(sum(P_sens.^2,2))); colorbar; 
+        h2 = quiver(emb.nom.pts(:,1),emb.nom.pts(:,2),P_sens(:,1),P_sens(:,2),1,'k','linewidth',2);
+%         scatter(emb.nom.pts(:,1),emb.nom.pts(:,2),'k.')
+        fig.CurrentAxes.Visible = 'off';
+%         subplot(2,1,1), h1p = plot(emb_pert_fwd.pts(:,1),emb_pert_fwd.pts(:,2),'k','linewidth',1); axis equal; hold on;
+%         subplot(2,1,1), h3pbwd = scatter(P_pert_bwd(:,1),P_pert_bwd(:,2),15,'k.');
+%         subplot(2,1,1), h3pfwd = scatter(P_pert_fwd(:,1),P_pert_fwd(:,2),25,'k.');
         
-        % plot adjoint
+        % plot adjoint components
         subplot(1,2,2), plot(emb.nom.t,P_sens(:,1),'linewidth',2); hold on;
         subplot(1,2,2), plot(emb.nom.t,P_sens(:,2),'linewidth',2);
         
-        figure; hviz = h;
+        fig = figure; hviz = h; sub = 1;
         % Taylor series gradient
-        subplot(1,2,1), plot(P(:,1,i),P(:,2,i),'linewidth',2); axis equal; hold on;
-        subplot(1,2,1), plot(P_h_fwd(:,1),P_h_fwd(:,2),'k');
-        subplot(1,2,1), quiver(P(:,1,i),P(:,2,i),H(:,1,i),H(:,2,i),1)
+        plot(P(:,1,i),P(:,2,i),'linewidth',2); axis equal; hold on;
+        plot(P_h_fwd(:,1),P_h_fwd(:,2),'k');
+        quiver(P(1:sub:end,1,i),P(1:sub:end,2,i),H(1:sub:end,1,i),H(1:sub:end,2,i),1,'k');
+        fig.CurrentAxes.Visible = 'off';
         % projected gradient
-        subplot(1,2,2), plot(P(:,1,i),P(:,2,i),'linewidth',2); axis equal; hold on;
-        subplot(1,2,2), quiver(P(:,1,i),P(:,2,i),Hproj(:,1,i),Hproj(:,2,i),1)
-        subplot(1,2,2), plot(P(:,1,i) + hviz*Hproj(:,1,i), P(:,2,i) + hviz*Hproj(:,2,i),'k')
-          h6 = annotation('textbox', [0 0.9 1 0.1], ...
-            'String', ['Directory index i=',num2str(i),', ',dir_adj(2+i).name], ...
-            'EdgeColor', 'none', ...
-            'HorizontalAlignment', 'center');
+        fig = figure;
+        plot(P(:,1,i),P(:,2,i),'linewidth',2); axis equal; hold on;
+        quiver(P(1:sub:end,1,i),P(1:sub:end,2,i),Hproj(1:sub:end,1,i),Hproj(1:sub:end,2,i),1,'k')
+        plot(P(:,1,i) + hviz*Hproj(:,1,i), P(:,2,i) + hviz*Hproj(:,2,i),'k')
+        fig.CurrentAxes.Visible = 'off';
+%           h6 = annotation('textbox', [0 0.9 1 0.1], ...
+%             'String', ['Directory index i=',num2str(i),', ',dir_adj(2+i).name], ...
+%             'EdgeColor', 'none', ...
+%             'HorizontalAlignment', 'center');
         close all;
 
     end
@@ -248,6 +254,14 @@ disp([num2str(toc),' sec.'])
 W = reshape(AS(:,1),N,2);
 W1 = reshape(AS(:,1),N,2); W2 = reshape(AS(:,2),N,2);
 
+% project to PGA basis
+% rAS = rPGA;
+% [AS,Eigs] = svd(1/sqrt(Naf)*PGA(:,1:rPGA)'*[reshape(PTH0(:,1,:),N,Naf);...
+%                    reshape(PTH0(:,2,:),N,Naf)]);
+% AS = PGA(:,1:rPGA)*AS;
+% W = reshape(AS(:,1),N,2);
+% W1 = reshape(AS(:,1),N,2); W2 = reshape(AS(:,2),N,2);
+
 % embedded OPG [Mukherjee]
 [embAS,embEigs] = svd(1/sqrt(Naf)*[reshape(H(:,1,:),N,Naf);...
                    reshape(H(:,2,:),N,Naf)]);
@@ -277,7 +291,8 @@ for i=1:size(PGAW,3), PGA_fwd(:,:,i) = Gr_exp(0.1,muP,PGAW(:,:,i)); end
 %% Visualize subspace computations
 % visualize eigenvalues
 figure; 
-subplot(1,2,1), scatter(1:Naf,diag(Eigs(1:Naf,1:Naf))); hold on;
+% subplot(1,2,1), scatter(1:Naf,diag(Eigs(1:Naf,1:Naf))); hold on;
+subplot(1,2,1), scatter(1:rPGA,diag(Eigs(1:rPGA,1:rPGA))); hold on;
 subplot(1,2,1), scatter(1:Naf,diag(embEigs(1:Naf,1:Naf)),15,'filled');
 set(gca, 'YScale', 'log'); grid on; legend('AMG','Emb. OPG');
 xlabel('$$index$$'); title('$$AMG \,\, Eigenvalues$$');
@@ -285,23 +300,31 @@ subplot(1,2,2), scatter(1:min([2*N,Naf]),diag(PGAeigs)); hold on;
 set(gca, 'YScale', 'log'); grid on;
 xlabel('$$index$$'); title('$$PGA \,\, Eigenvalues$$');
 
+figure;
+scatter(1:Naf,diag(Eigs(1:Naf,1:Naf))); hold on;
+scatter(1:Naf,diag(embEigs(1:Naf,1:Naf)),10,'filled');
+set(gca, 'YScale', 'log'); grid on;
+
+figure;
+scatter(1:min([2*N,Naf]),diag(PGAeigs)); hold on;
+set(gca, 'YScale', 'log'); grid on;
+
 % visualize eigenvectors
 % quiver subset parameter
 % first eigenvector
 sub = 10; 
 fig = figure;
 % forward AMG
-subplot(2,1,1), bndplot(fig,muP(:,1),muP(:,2),sqrt(W(:,1).^2 + W(:,2).^2)); axis equal; hold on;
-subplot(2,1,1), plot(muP(:,1),muP(:,2),'w','linewidth',2); 
+% subplot(2,1,1), bndplot(fig,muP(:,1),muP(:,2),sqrt(W(:,1).^2 + W(:,2).^2)); axis equal; hold on;
+subplot(2,1,1), plot(muP(:,1),muP(:,2),'linewidth',2); axis equal; hold on;
 subplot(2,1,1), plot(AMG_fwd1(:,1),AMG_fwd1(:,2),'k','linewidth',2);
 subplot(2,1,1), quiver(muP(1:sub:end,1),muP(1:sub:end,2),W(1:sub:end,1),W(1:sub:end,2),1,'k');
 subplot(2,1,1), embh = plot(embAMG_fwd1(:,1),embAMG_fwd1(:,2),'r--','linewidth',2);
 fig.CurrentAxes.Visible = 'off';
 
 % forward AMG over physical shape
-subplot(2,1,2), bndplot(fig,muP0(:,1),muP0(:,2),sqrt(W(:,1).^2 + W(:,2).^2)); 
-axis equal; hold on; colorbar off;
-subplot(2,1,2), plot(muP0(:,1),muP0(:,2),'w','linewidth',2); 
+% subplot(2,1,2), bndplot(fig,muP0(:,1),muP0(:,2),sqrt(W(:,1).^2 + W(:,2).^2)); axis equal; hold on; colorbar off; 
+subplot(2,1,2), plot(muP0(:,1),muP0(:,2),'linewidth',2); axis equal; hold on;
 subplot(2,1,2), plot(AMG0_fwd1(:,1),AMG0_fwd1(:,2),'k','linewidth',2);
 subplot(2,1,2), plot(embAMG0_fwd1(:,1),embAMG0_fwd1(:,2),'--','color',embh.Color,'linewidth',2);
 fig.CurrentAxes.Visible = 'off';
@@ -315,17 +338,16 @@ annotation('textbox', [0 0.9 1 0.1], ...
 fig = figure;
 % second eigenvector
 % forward AMG
-subplot(2,1,1), bndplot(fig,muP(:,1),muP(:,2),sqrt(W2(:,1).^2 + W2(:,2).^2)); axis equal; hold on;
-subplot(2,1,1), plot(muP(:,1),muP(:,2),'w','linewidth',2); 
+% subplot(2,1,1), bndplot(fig,muP(:,1),muP(:,2),sqrt(W2(:,1).^2 + W2(:,2).^2)); axis equal; hold on;
+subplot(2,1,1), plot(muP(:,1),muP(:,2),'linewidth',2); axis equal; hold on;
 subplot(2,1,1), plot(AMG_fwd2(:,1),AMG_fwd2(:,2),'k','linewidth',2);
 subplot(2,1,1), quiver(muP(1:sub:end,1),muP(1:sub:end,2),W2(1:sub:end,1),W2(1:sub:end,2),1,'k');
 subplot(2,1,1), embh = plot(embAMG_fwd2(:,1),embAMG_fwd2(:,2),'r--','linewidth',2);
 fig.CurrentAxes.Visible = 'off';
 
 % forward AMG over physical shape
-subplot(2,1,2), bndplot(fig,muP0(:,1),muP0(:,2),sqrt(W2(:,1).^2 + W2(:,2).^2)); 
-axis equal; hold on; colorbar off;
-subplot(2,1,2), plot(muP0(:,1),muP0(:,2),'w','linewidth',2); 
+% subplot(2,1,2), bndplot(fig,muP0(:,1),muP0(:,2),sqrt(W2(:,1).^2 + W2(:,2).^2)); axis equal; hold on; colorbar off;
+subplot(2,1,2), plot(muP0(:,1),muP0(:,2),'linewidth',2); axis equal; hold on;
 subplot(2,1,2), plot(AMG0_fwd2(:,1),AMG0_fwd2(:,2),'k','linewidth',2);
 subplot(2,1,2), plot(embAMG0_fwd2(:,1),embAMG0_fwd2(:,2),'--','color',embh.Color,'linewidth',2);
 fig.CurrentAxes.Visible = 'off';
@@ -339,9 +361,9 @@ annotation('textbox', [0 0.9 1 0.1], ...
         
 % PGA modes
 fig = figure;
-for i=1:rPGA
-    subplot(2,2,i), bndplot(fig,muP(:,1),muP(:,2),sqrt(PGAW(:,1,i).^2 + PGAW(:,2,i).^2)); axis equal; hold on;
-    subplot(2,2,i), plot(muP(:,1),muP(:,2),'w','linewidth',2); 
+for i=1:4
+%     subplot(2,2,i), bndplot(fig,muP(:,1),muP(:,2),sqrt(PGAW(:,1,i).^2 + PGAW(:,2,i).^2)); axis equal; hold on;
+    subplot(2,2,i), plot(muP(:,1),muP(:,2),'linewidth',2); axis equal; hold on;
     subplot(2,2,i), plot(PGA_fwd(:,1,i),PGA_fwd(:,2,i),'k','linewidth',1);
     subplot(2,2,i), quiver(muP(1:sub:end,1),muP(1:sub:end,2),PGAW(1:sub:end,1,i),PGAW(1:sub:end,2,i),1,'k');
     fig.CurrentAxes.Visible = 'off';
@@ -385,6 +407,11 @@ for i=1:Naf
     tic;
     tproj(Iadj(i),1) = fminbnd(@(t) dGr_np(Gr_exp(t,muP,W1),P(:,:,i)),-2,2);
     tproj(Iadj(i),2) = fminbnd(@(t) dGr_np(Gr_exp(t,muP,W2),P(:,:,i)),-2,2);
+    % simultaneous minimization
+%     tproj(Iadj(i),:) = fmincon(@(t) dGr_np(Gr_exp(1,muP,...
+%         reshape([reshape(W1,2*N,1), reshape(W2,2*N,1)]*t',N,2)),P(:,:,i)),[0,0],...
+%         [],[],[],[],[-5,-5],[5,5]);
+    
 end
 disp(['... finished in ',num2str(toc),' sec.']);
 
@@ -394,7 +421,9 @@ t2 = linspace(min(tproj*Utprj(:,1)),max(tproj*Utprj(:,1)),100);
 t2sweep = t2'*Utprj(:,1)';
 
 %% 1st principal AMG sweep
-Nt = 100; t = linspace(-0.5,0.5,Nt);
+Nt = 100; 
+% t = linspace(-0.5,0.5,Nt);
+t = linspace(min(tproj(:,1)),max(tproj(:,1)),Nt);
 % PICK SUBSPACE:
 % dominant Parallel trans. AMG
 WAMG = reshape(AS(:,1),N,2);
@@ -512,6 +541,6 @@ subplot(1,2,2), scatter(t,zeros(Nt,1),50,'filled','cdata',Fsweep);
 % plot warnings
 subplot(1,2,2), scatter(t(WARN),zeros(length(t(WARN)),1),200,'rx','linewidth',2)
 %% save data
-close all;
+% close all;
 clearvars sweepdata
 save([datapath,'/',cnt_dsn,'/AMG_postproc.mat']);

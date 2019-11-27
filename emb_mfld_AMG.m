@@ -135,10 +135,14 @@ end
 % end
 
 % SVD of tangential vectors
-[U,D,~] = svd(1/sqrt(N)*Ux*Vlog',0); U = U'*Ux;
+disp('Computing important directions...');
+% compute in intrinsic dimension
+% [U,D,~] = svd(1/sqrt(N)*Ux*Vlog',0); U = U'*Ux;
+% compute in extrinsic dimension
+[U,D,~] = svd(1/sqrt(N)*Vlog',0); U = U(:,1:2)';
 
 % compute error w.r.t Mukherjee embedding definition
-[Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
+[Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,2); %W = W./norm(W);
 if U(1,:)*W < 0, W = -W; end
 % subspace distance to the embedding definition
 if exist('a','var')
@@ -232,12 +236,13 @@ plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',2)
 % scatter3(reshape(Gset(:,:,1),k*N,1),reshape(Gset(:,:,2),k*N,1),reshape(Gset(:,:,3),k*N,1),'k')
 
 % visualize log map vectors
-quiver3(repmat(p0(1),N,1),repmat(p0(2),N,1),repmat(p0(3),N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
+% quiver3(repmat(p0(1),N,1),repmat(p0(2),N,1),repmat(p0(3),N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
 quiver3(p0(1),p0(2),p0(3),U(1,1),U(1,2),U(1,3),1,'k','linewidth',2);
 quiver3(p0(1),p0(2),p0(3),U(2,1),U(2,2),U(2,3),1,'k--','linewidth',2);
 % visualize Mukherjee embedding projection 
 quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'r','linewidth',2);
+quiver3(p0(1)*ones(3,1),p0(2)*ones(3,1),p0(3)*ones(3,1),Uemb(1,:)',Uemb(2,:)',Uemb(3,:)','r--','linewidth',2);
 % visualize PGA basis
 quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux(:,3),1,'color',0.5*ones(1,3),'linewidth',2);
 
