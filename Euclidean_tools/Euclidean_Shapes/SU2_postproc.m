@@ -8,7 +8,8 @@ addpath ~/RESEARCH/SHDP/
 % datapath = '~/RESEARCH/SHDP';
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cd_adj'; QOI  = 3;
 % datapath = '~/RESEARCH/AMG_DATA/Cd_adj'; QOI = 3;
-datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3;
+% datapath = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj'; QOI = 3;
+datapath = '~/RESEARCH/AMG_DATA/uni_PGA_samples/Cd_adj'; QOI = 3;
 % datapath = '/media/zgrey/46AFC5285FA7ADF9/AMG_DATA/Cl_adj'; QOI = 2;
 
 load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg','PGA','rPGA');
@@ -17,7 +18,7 @@ load([datapath,'/qiqi_PGA_meshes.mat'],'Minv_avg','PGA','rPGA');
 % sweepdata = '~/RESEARCH/AMG_DATA/Cd_adj/karcher';
 % sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher';
 
-sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher/PGA_basis';
+% sweepdata = '~/RESEARCH/AMG_DATA/PGA_samples/Cd_adj/karcher/PGA_basis';
 
 % number of resampled points
 N = 1000; % 1000 achieved BEST results (visually)
