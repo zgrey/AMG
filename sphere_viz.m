@@ -222,3 +222,46 @@ for i=1:Ncurv
     
     delete([h1,h2,h3,h4,h5]);
 end
+
+%% 2-manifold representations
+N = 10; S = 0.5*[pi*rand(N,1), pi/2*rand(N,1)];
+X = @(S) [cos(S(:,1)).*sin(S(:,2)),sin(S(:,1)).*sin(S(:,2)),cos(S(:,2))];
+% X = @(S) 0.25*[(2 + cos(S(:,2))).*cos(S(:,1)), (2 + cos(S(:,2))).*sin(S(:,1)), sin(S(:,2))];
+P = X(S); Nmfld = 25;
+
+fig = figure;
+[U,V] = meshgrid(linspace(0,2*pi,Nmfld),linspace(0,2*pi,Nmfld));
+M = X([reshape(U,Nmfld^2,1), reshape(V,Nmfld^2,1)]);
+XX = reshape(M(:,1),Nmfld,Nmfld); YY = reshape(M(:,2),Nmfld,Nmfld); ZZ = reshape(M(:,3),Nmfld,Nmfld);
+h = mesh(XX,YY,ZZ,ones(size(ZZ))); h.EdgeColor = [0.3,0.75,0.93];
+hold on; axis equal; alpha(0.5); 
+scatter3(P(:,1),P(:,2),P(:,3),50,'o','filled','markeredgecolor','k'); fig.CurrentAxes.Visible = 'off';
+
+% subspace
+[A,D] = svd((P - mean(P,1))');
+[X,Y] = meshgrid(linspace(-1,1,Nmfld),linspace(-1,1,Nmfld));
+Ptan = [mean(P,1) + A(:,1)'; mean(P,1) + A(:,2)'; mean(P,1) - A(:,1)';...
+        mean(P,1) - A(:,2)'; mean(P,1) + A(:,1)'];
+plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k-','linewidth',2);
+quiver3(mean(P(:,1)),mean(P(:,2)),mean(P(:,3)),A(1,1),A(2,1),A(3,1),1,'k','linewidth',2)
+quiver3(mean(P(:,1)),mean(P(:,2)),mean(P(:,3)),A(1,2),A(2,2),A(3,2),1,'k','linewidth',2)
+alpha(0.5);
+
+% implicit function
+V = @(P) [ones(size(P,1),1) P(:,1) P(:,2) P(:,1).*P(:,2) P(:,1).^2 P(:,2).^2];
+c = V(P) \ P(:,3);
+F = V([reshape(X,Nmfld^2,1), reshape(Y,Nmfld^2,1)])*c;
+h = surf(X,Y,reshape(F,Nmfld,Nmfld)); alpha(0.5);
+h.FaceAlpha = 0.5;
+h.EdgeColor = 'none';
+
+% level set
+f = @(c,P) [ones(size(P,1),1) P P(:,1).*P(:,2) P(:,1).*P(:,3) P(:,2).*P(:,3) P.^2]*c;
+[c,fopt] = fminunc(@(c) sum(f(c,P).^2),rand(nchoosek(5,2),1));
+[P1,P2,P3] = meshgrid(2*linspace(-1,1,Nmfld),2*linspace(-1,1,Nmfld),2*linspace(-1,1,Nmfld));
+PP = [reshape(P1,Nmfld^3,1), reshape(P2,Nmfld^3,1), reshape(P3,Nmfld^3,1)];
+FV = isosurface(P1, P2, P3,reshape(f(c,PP),Nmfld,Nmfld,Nmfld),0);
+Ptch = patch(FV);
+Ptch.FaceAlpha = 0.5;
+Ptch.EdgeColor = 'none';
+Ptch.FaceColor = [0.3,0.75,0.93];
