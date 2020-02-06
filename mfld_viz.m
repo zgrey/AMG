@@ -1,20 +1,38 @@
 clc; close all; clearvars;
-%% model manifolds
+%% Things to modify
+% number of "data" points from manifold (for training)
+N = 100;
+% noise parameter for data
+e = 0;
+% number of intersecting quadratics
+nq = 50;
+% number of points per dimension for reevaluation
+Nmfld = 100;
+% size of ball for computing level-set intersection
+int_ball = 0.05;
+% multiple of furthest neighbor to size nearest neighbor for manifold-valued data
+pct = 0.05;
+
+%% model data-manifolds
 % 1-manifold representations
-N = 100; e = 0; p = 5; Nmfld = 100;
-C = rand(p,3); t = linspace(-0.5,0.5,N);
+p = 5; C = rand(p,3); t = linspace(-0.5,0.5,N);
 % P0 = [ [cos(pi*t'), t'.^(1:p-1)]*C(:,1),...
 %       [sin(pi*t').^2, t'.^(1:p-1)]*C(:,2),...
 %       [cos(pi/2*t'), t'.^(1:p-1)]*C(:,3)]; 
 P0 = [ cos(2*pi*t'), sin(2*pi*t'), 10*t'.^3];
+% center
+P0 = P0 - mean(P0,1);
+% add noise (if any)
 P = P0 + e*randn(N,1);
+% visualize
 fig = figure;
-scatter3(P(:,1),P(:,2),P(:,3),50,'o','filled','k');
+scatter3(P(:,1),P(:,2),P(:,3),50,'o','filled','r');
 hold on; axis equal; grid on; alpha(0.5);
 plot3(P0(:,1),P0(:,2),P0(:,3),'r--','linewidth',2)
 
+
 % 2-manifold representations
-% N = 100; S = [2*pi*rand(N,1), pi/2*rand(N,1)]; Nmfld = 100;
+% N = 100; S = [pi*rand(N,1), pi*rand(N,1)]; Nmfld = 100;
 % % sphere
 % X = @(S) [cos(S(:,1)).*sin(S(:,2)),sin(S(:,1)).*sin(S(:,2)),cos(S(:,2))];
 % % torus
@@ -47,130 +65,111 @@ plot3(P0(:,1),P0(:,2),P0(:,3),'r--','linewidth',2)
 % h.FaceAlpha = 0.5;
 % h.EdgeColor = 'none';
 
-% quadratic
-f = @(c,P) sum((P*[c(1) c(2) c(3);0 c(4) c(5);0 0 c(6)]').*P,2) + P*[c(7); c(8); c(9)] + c(10);
+% quadratic(s)
+cq = zeros(nchoosek(5,2),nq); G = cell(nq,1); H = cell(nq,1);
+for i = 1:nq
+    f = @(c,P) sum((P*[c(1) c(2) c(3);0 c(4) c(5);0 0 c(6)]').*P,2) + P*[c(7); c(8); c(9)] + c(10);
 
-% "training" or "learning"
-[c1,fopt1] = fminunc(@(c) sum(f(c,P).^2),rand(nchoosek(5,2),1));
-% maps describing intrinsic properties of the trained zero-set
-A1 = [c1(1) c1(2) c1(3);0 c1(4) c1(5);0 0 c1(6)]; a1 = [c1(7); c1(8); c1(9)];
-% gradient
-G1 = @(P) P*(A1' + A1) + repmat(a1',size(P,1),1); 
-% Hessian
-H1 = A1 + A1';
+    % "training" or "learning"
+    options = optimoptions('fminunc','Display','none');
+    [cq(:,i),~] = fminunc(@(c) sum(f(c,P).^2),rand(nchoosek(5,2),1),options);
+    % maps describing intrinsic properties of the trained zero-set
+    A = [cq(1,i) cq(2,i) cq(3,i);0 cq(4,i) cq(5,i);0 0 cq(6,i)];
+    a = [cq(7,i); cq(8,i); cq(9,i)];
+    % gradient
+    G{i} = @(P) P*(A' + A) + repmat(a',size(P,1),1); 
+    % Hessian
+    H{i} = A + A';
+end
 
-% another quadratic
-[c2,fopt2] = fminunc(@(c) sum(f(c,P).^2),10*rand(nchoosek(5,2),1));
-A2 = [c2(1) c2(2) c2(3);0 c2(4) c2(5);0 0 c2(6)]; a2 = [c2(7); c2(8); c2(9)];
-% gradient
-G2 = @(P) P*(A2' + A2) + repmat(a2',size(P,1),1); 
-% Hessian
-H2 = A2 + A2';
+% sum of quadratic level-sets
+[c3,~] = fminunc(@(c) sum(f(c(1:end/2),P).^2 + f(c(end/2+1:end),P).^2),10*rand(2*nchoosek(5,2),1),options);
 
-% "intersection" of quadratics
-[c3,~] = fminunc(@(c) sum(f(c(1:end/2),P).^2 + f(c(end/2+1:end),P).^2),10*rand(2*nchoosek(5,2),1));
-
-% "encoder"
+% Fully connected neural net with ELU activation
 % params
-d = 2; m = 3;
-obj = @(c) sum(Enc_ELU(P,reshape([c(1:m^2*d - 2*m); zeros(2*m,1)],m,m,d),...
-                         reshape([c(m^2*d - 2*m + 1:end); zeros(m-1,1)], m,d) ).^2);
+strc = [3 2 1 2 3]; alph = 0.1;
+obj = @(c) sum(sum((P - NN_ELU(P, c(1:sum(strc.*[strc(2:end), 0])),...
+                             c(sum(strc.*[strc(2:end), 0]) + 1:end),...
+                             strc,alph) ).^2,2));
 prblm = createOptimProblem('fmincon','objective', obj,...
-                        'x0', rand(m^2*d - 2*m + m*d - (m - 1),1));
+                           'x0', 2*rand(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1)-1,...
+                           'lb',-100*ones(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1),...
+                           'ub',100*ones(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1));
 GS = GlobalSearch;
-[copt,~] = run(GS,prblm);
-
-% build aggregate of "trained" affine functions
-Wopt = reshape([copt(1:m^2*d - 2*m); zeros(2*m,1)],m,m,d);
-bopt = reshape([copt(m^2*d - 2*m + 1:end); zeros(m-1,1)], m,d);
-
-% "autoencoder" (Decoder o Encoder)
-% shft = m^2*d - 2*m + m*d - (m - 1) +1;
-% obj = @(c) sum(Dec_ELU(Enc_ELU(P,reshape([c(1:m^2*d - 2*m); zeros(2*m,1)],m,m,d),...
-%                          reshape([c(m^2*d - 2*m + 1:end); zeros(m-1,1)], m,d)),...
-%                          reshape([zeros(2*m,1); c(shft:shft + m^2*d - 2*m)],m,m,d),...
-%                          reshape([zeros(m-1,1); c(shft + m^2*d - 2*m + 1:end)], m,d) ).^2);
-% prblm = createOptimProblem('fmincon','objective', obj,...
-%                         'x0', rand(2*(m^2*d - 2*m + m*d - (m - 1)),1));
-% GS = GlobalSearch;
-% [copt,~] = run(GS,prblm);
+[copt,LossOpt] = run(GS,prblm);
+vecW = copt(1:sum(strc.*[strc(2:end), 0]));
+vecb = copt(sum(strc.*[strc(2:end), 0]) + 1:end);
 
 %% resample domain
 % high dimensional domain samples for patch surface
 scl = 3;
-[P1,P2,P3] = meshgrid(scl*linspace(min(P(:,1)),max(P(:,1)),Nmfld),...
-                      scl*linspace(min(P(:,2)),max(P(:,2)),Nmfld),...
-                      scl*linspace(min(P(:,3)),max(P(:,3)),Nmfld));
-% [P1,P2,P3] = meshgrid(linspace(-1,1,Nmfld),...
-%                       linspace(-1,1,Nmfld),...
-%                       linspace(-1,1,Nmfld));
-
-%% Visualize shapes
+[P1,P2,P3] = meshgrid(linspace(scl*min(P(:,1)),scl*max(P(:,1)),Nmfld),...
+                      linspace(scl*min(P(:,2)),scl*max(P(:,2)),Nmfld),...
+                      linspace(scl*min(P(:,3)),scl*max(P(:,3)),Nmfld));
 PP = [reshape(P1,Nmfld^3,1), reshape(P2,Nmfld^3,1), reshape(P3,Nmfld^3,1)];
-FV1 = isosurface(P1, P2, P3,reshape(f(c1,PP),Nmfld,Nmfld,Nmfld),0);
-FV2 = isosurface(P1, P2, P3,reshape(f(c2,PP),Nmfld,Nmfld,Nmfld),0);
-FV1cap2 = isosurface(P1, P2, P3,reshape(f(c3(1:end/2),PP) + f(c3(end/2+1:end),PP),Nmfld,Nmfld,Nmfld),0); 
-FVnet = isosurface(P1, P2, P3,reshape(Enc_ELU(PP,Wopt,bopt),Nmfld,Nmfld,Nmfld),0);
 
-% curvature of level set
-K1 = abs( sum((G1(FV1.vertices)*H1').*G1(FV1.vertices),2) - sum(G1(FV1.vertices).^2,2)*trace(H1) )...
-    ./ (2*sum(G1(FV1.vertices).^2,2).^(3/2));
-K2 = abs( sum((G2(FV2.vertices)*H2').*G2(FV2.vertices),2) - sum(G2(FV2.vertices).^2,2)*trace(H2) )...
-    ./ (2*sum(G2(FV2.vertices).^2,2).^(3/2));
+%% Visualize manifolds
+% level-set of submersion 
+FVnet = isosurface(P1, P2, P3,...
+                   reshape(sum(NN_ELU(PP,vecW,vecb,...
+                   strc(1:floor(end/2) +1),alph),2),...
+                   Nmfld,Nmfld,Nmfld),0);
+               
+FVsum = isosurface(P1, P2, P3,reshape(f(c3(1:end/2),PP) + f(c3(end/2+1:end),PP),Nmfld,Nmfld,Nmfld),0);
 
-% first quadratic
-Ptch = patch(FV1,'FaceVertexCData',log(K1),'FaceColor','interp'); 
-camlight; lighting phong; colorbar;
-Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
+FV = cell(nq,1);
+for i=1:nq
+    
+    FV{i} = isosurface(P1, P2, P3,reshape(f(cq(:,i),PP),Nmfld,Nmfld,Nmfld),0);
+    if ~isempty(FV{i}.vertices)
+        % curvature of level set
+        K = abs( sum((G{i}(FV{i}.vertices)*H{i}').*G{i}(FV{i}.vertices),2) - sum(G{i}(FV{i}.vertices).^2,2)*trace(H{i}) )...
+            ./ (2*sum(G{i}(FV{i}.vertices).^2,2).^(3/2));
 
-% second quadratic
-Ptch = patch(FV2,'FaceVertexCData',log(K2),'FaceColor','interp'); 
-camlight; lighting phong; colorbar;
-Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
+        % plot level-set
+%         Ptch = patch(FV{i},'FaceVertexCData',log(K),'FaceColor','interp'); 
+%         camlight; lighting phong; colorbar;
+%         Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
 
+        if i > 1
+            D = pdist2(FVINT,FV{i}.vertices);
+            FV_ind = max(D <= int_ball,[],1)'; FVINT= FV{i}.vertices(FV_ind,:);
+        elseif i == 1
+            FVINT = FV{i}.vertices;
+        end
+    end
+end
+                        
 % intersection of quadratics
-% Ptch = patch(FV1cap2); 
+scatter3(FVINT(:,1),FVINT(:,2),FVINT(:,3),'k.');
+% Ptch = patch(FVsum); 
 % camlight; lighting phong; colorbar;
 % Ptch.FaceAlpha = 0.5; Ptch.EdgeColor = 'none';
 
-% Net
-Ptch = patch(FVnet); 
-camlight; lighting phong;
-Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
-% Dense visualization of Net response
-% figure; scatter3(PP(1:70:end,1),PP(1:70:end,2),PP(1:70:end,3),25,'filled','cdata',Enc_ELU(PP(1:70:end,:),Wopt,bopt));
+% nearest-neighbor over learned manifold
+mfldD = pdist2(FVINT,P);
+mfld_ind = max(mfldD <= pct*max(max(mfldD)),[],2)'; mfldPP = FVINT(mfld_ind,:);
+scatter3(mfldPP(:,1),mfldPP(:,2),mfldPP(:,3),50,'ko','linewidth',2);
+
+% Net submersion level-set (domain partition)
+% Ptch = patch(FVnet); 
+% camlight; lighting phong;
+% Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
 % alpha(0.5); colorbar;
 
-%% Convergence visualization
-% imgfig = figure;
-% h = mesh(XX,YY,ZZ,ones(size(ZZ))); h.EdgeColor = [0.3,0.75,0.93];
-% hold on; axis equal; alpha(0.5); imgfig.CurrentAxes.Visible = 'off';
-% gifname = './img/mfld_learn.jpg';
-% for N = 1
-%     S = [2*pi*rand(N,1), pi*rand(N,1)];
-%     P = X(S);
-%     
-%     % data
-%     h = scatter3(P(:,1),P(:,2),P(:,3),50,'o','filled','markeredgecolor','k');
-%     
-%     [c,fopt] = fminunc(@(c) sum(f(c,P).^2),rand(nchoosek(5,2),1));
-%     [P1,P2,P3] = meshgrid(2*linspace(-1,1,Nmfld),2*linspace(-1,1,Nmfld),2*linspace(-1,1,Nmfld));
-%     PP = [reshape(P1,Nmfld^3,1), reshape(P2,Nmfld^3,1), reshape(P3,Nmfld^3,1)];
-%     FV = isosurface(P1, P2, P3,reshape(f(c,PP),Nmfld,Nmfld,Nmfld),0);
-%     Ptch = patch(FV);
-%     Ptch.FaceAlpha = 0.5;
-%     Ptch.EdgeColor = 'none';
-%     Ptch.FaceColor = [0.3,0.75,0.93];
-%     axis([-2,2,-2,2]);
-%     
-%     % build gif
-%     figure(imgfig); frame = getframe(imgfig); 
-%     [A,map] = rgb2ind(frame2im(frame),256);
-%     imwrite(A,map,[gifname,'-',num2str(N),'.jpg'],'jpeg');
-%         
-%     delete([h,Ptch]);
-%     
-% end
+% THIS ISN'T WORKING WELL (Bug?)
+% neural-net manifold parameterization assuming strc = [3 2 1 2 3]
+% size domain based on "learned" local chart
+substrc = [3 2 1];
+subW = vecW(1:sum(substrc.*[substrc(2:end), 0]));
+subb = vecb(1:sum(substrc(2:end)));
+lclEuc = NN_ELU(P,subW,subb,substrc,alph);
+% evaluate parameterization
+imW = vecW(7:end);
+imb = vecb(4:end);
+imstrc = [1 2 3];
+NN_mfld = NN_ELU(linspace(min(lclEuc),max(lclEuc),100)', imW,imb,imstrc,alph);
+% figure; plot3(NN_mfld(:,1),NN_mfld(:,2),NN_mfld(:,3))
 
 %% Rotating axis movie
 % get current figure
