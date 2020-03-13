@@ -87,18 +87,25 @@ end
 
 % Fully connected neural net with ELU activation
 % params
-strc = [3 2 1 2 3]; alph = 0.1;
+N3 = 1; N2 = 1;
+strc = [3*ones(1,N3) 2*ones(1,N2) 1]; alph = 1;
+% autoencoder
+strc = [strc strc(end-1:-1:1)];
 obj = @(c) sum(sum((P - NN_ELU(P, c(1:sum(strc.*[strc(2:end), 0])),...
                              c(sum(strc.*[strc(2:end), 0]) + 1:end),...
                              strc,alph) ).^2,2));
-prblm = createOptimProblem('fmincon','objective', obj,...
-                           'x0', 2*rand(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1)-1,...
-                           'lb',-100*ones(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1),...
-                           'ub',100*ones(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1));
-GS = GlobalSearch;
-[copt,LossOpt] = run(GS,prblm);
-vecW = copt(1:sum(strc.*[strc(2:end), 0]));
-vecb = copt(sum(strc.*[strc(2:end), 0]) + 1:end);
+% prblm = createOptimProblem('fmincon','objective', obj,...
+%                            'x0', 2*rand(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1)-1,...
+%                            'lb',-100*ones(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1),...
+%                            'ub',100*ones(sum(strc.*[strc(2:end), 0]) + sum(strc(2:end)),1));
+% GS = GlobalSearch;
+% [copt,LossOpt] = run(GS,prblm);
+% vecW = copt(1:sum(strc.*[strc(2:end), 0]));
+% vecb = copt(sum(strc.*[strc(2:end), 0]) + 1:end);
+
+% random coefficients
+vecW = randn(sum(strc.*[strc(2:end), 0]),1);
+vecb = randn(sum(strc(2:end)),1);
 
 %% resample domain
 % high dimensional domain samples for patch surface
@@ -152,24 +159,24 @@ mfld_ind = max(mfldD <= pct*max(max(mfldD)),[],2)'; mfldPP = FVINT(mfld_ind,:);
 scatter3(mfldPP(:,1),mfldPP(:,2),mfldPP(:,3),50,'ko','linewidth',2);
 
 % Net submersion level-set (domain partition)
-% Ptch = patch(FVnet); 
-% camlight; lighting phong;
-% Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
-% alpha(0.5); colorbar;
+Ptch = patch(FVnet); 
+camlight; lighting phong;
+Ptch.FaceAlpha = 0.8; Ptch.EdgeColor = 'none';
+alpha(0.5); colorbar;
 
 % THIS ISN'T WORKING WELL (Bug?)
 % neural-net manifold parameterization assuming strc = [3 2 1 2 3]
 % size domain based on "learned" local chart
-substrc = [3 2 1];
+substrc = strc(1:(end + 1)/2);
 subW = vecW(1:sum(substrc.*[substrc(2:end), 0]));
 subb = vecb(1:sum(substrc(2:end)));
 lclEuc = NN_ELU(P,subW,subb,substrc,alph);
-% evaluate parameterization
+% evaluate parameterization over compact domain
 imW = vecW(7:end);
 imb = vecb(4:end);
-imstrc = [1 2 3];
+imstrc = substrc(end:-1:1);
 NN_mfld = NN_ELU(linspace(min(lclEuc),max(lclEuc),100)', imW,imb,imstrc,alph);
-% figure; plot3(NN_mfld(:,1),NN_mfld(:,2),NN_mfld(:,3))
+figure; plot3(NN_mfld(:,1),NN_mfld(:,2),NN_mfld(:,3),'linewidth',2)
 
 %% Rotating axis movie
 % get current figure
