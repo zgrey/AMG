@@ -9,10 +9,10 @@ function Ptt0 = iso_angle(p,p0,Gt,U,Log)
 m = size(p,1);
 
 % compute inverse exponentials of central and sample point
-Vlog0 = -Log(p0,p); Vlog = Log(p,p0);
+Vlog0 = -Log(p0,p); Vlog = Log(p,p0); Vlog = -Vlog/norm(Vlog);
 
 % compute the cosine and sine of the angle
-cost = Vlog*Gt'/(sqrt(sum(Vlog.^2,2))*sqrt(sum(Gt.^2,2)));
+cost = Vlog*Gt'/norm(Gt);
 sint = sqrt(1-cost^2);
 
 % rotation in the subspace spanned by U

@@ -34,9 +34,9 @@ Nc = histc(L,cumd);
 
 fig = figure; gifname = 'Rnd_geo.gif';
 % subplot(3,1,1), hd  = plot(cumd,ones(length(cumd),1),'o-','linewidth',2,'MarkerSize',10);
-subplot(2,2,1), hd  = plot(cos(cumd/sum(d)*2*pi),sin(cumd/sum(d)*2*pi),'o','linewidth',2,'MarkerSize',10); hold on;
-subplot(2,2,1), plot(cos(linspace(0,2*pi,100)),sin(linspace(0,2*pi,100)),'linewidth',2,'MarkerSize',10,'color',hd.Color);
-hold on; axis tight; axis equal;
+subplot(2,2,1), hd  = plot(cos(cumd/sum(d)*2*pi),sin(cumd/sum(d)*2*pi),'o-','linewidth',2,'MarkerSize',10); hold on;
+% subplot(2,2,1), plot(cos(linspace(0,2*pi,100)),sin(linspace(0,2*pi,100)),'linewidth',2,'MarkerSize',10,'color',hd.Color);
+hold on; axis tight; axis equal; P = [];
 for i=1:Nsmpl
     clc; disp([num2str(i),'/',num2str(Nsmpl),' walks complete']);
     t = linspace(0,1,Nc(i));
@@ -44,6 +44,8 @@ for i=1:Nsmpl
     % plot accumulating distance over Grassmannian
 %     subplot(2,2,1), hg = plot(cumd(i),1,'go','linewidth',2,'MarkerSize',10);
 %     subplot(2,2,1), hs = plot(cumd(i+1),1,'ro','linewidth',2,'MarkerSize',10);
+    xg = cos(cumd(i)/sum(d)*2*pi); yg = sin(cumd(i)/sum(d)*2*pi);
+    xs = cos(cumd(i+1)/sum(d)*2*pi); ys = sin(cumd(i+1)/sum(d)*2*pi);
     subplot(2,2,1), hg = plot(cos(cumd(i)/sum(d)*2*pi),sin(cumd(i)/sum(d)*2*pi),'o','linewidth',2,'MarkerSize',10,'color',[0 0.75 0]);
     subplot(2,2,1), hs = plot(cos(cumd(i+1)/sum(d)*2*pi),sin(cumd(i+1)/sum(d)*2*pi),'ro','linewidth',2,'MarkerSize',10);
     
@@ -61,6 +63,7 @@ for i=1:Nsmpl
     % compute direction
     [H] = Gr_log(Pgeo(:,:,i),Pgeo(:,:,i+1));
     % build geodesic *.gif
+    P = [P; xg yg];
     for ii=1:length(t)
         % shape geodesic
         Gr_geo = Gr_exp(t(ii),Pgeo(:,:,i),H);
@@ -69,11 +72,15 @@ for i=1:Nsmpl
         % visualize
 %         subplot(2,2,1), hL1 = plot([0, cumd(i) + t(ii)*d(i+1)],[1,1],'k','linewidth',2);
 %         subplot(2,2,1), hL2 = scatter(cumd(i) + t(ii)*d(i+1),1,100,'k','filled','linewidth',2);
-        tcirc = linspace(0,(cumd(i) + t(ii)*d(i+1))*2*pi/sum(d),100);
-        subplot(2,2,1), hL1 = plot(cos(tcirc),sin(tcirc),'k','linewidth',2);
-        tcirc = linspace(0,(cumd(i) + t(ii)*d(i+1))*2*pi/sum(d),100);
-        subplot(2,2,1), hL2 = scatter(cos((cumd(i) + t(ii)*d(i+1))*2*pi/sum(d)),...
-            sin((cumd(i) + t(ii)*d(i+1))*2*pi/sum(d)),50,'k','filled','linewidth',2);
+%         tcirc = linspace(0,(cumd(i) + t(ii)*d(i+1))*2*pi/sum(d),100);
+%         subplot(2,2,1), hL1 = plot(cos(tcirc),sin(tcirc),'k','linewidth',2);
+%         tcirc = linspace(0,(cumd(i) + t(ii)*d(i+1))*2*pi/sum(d),100);
+%         subplot(2,2,1), hL2 = scatter(cos((cumd(i) + t(ii)*d(i+1))*2*pi/sum(d)),...
+%             sin((cumd(i) + t(ii)*d(i+1))*2*pi/sum(d)),50,'k','filled','linewidth',2);
+        p = [xs; ys]*t(ii) + (1-t(ii))*[xg; yg];
+        subplot(2,2,1), hL1 = scatter(p(1),p(2),50,'k','filled','linewidth',2);
+        subplot(2,2,1), hL3 = plot([xg p(1)],[yg p(2)],'k','linewidth',2);
+        subplot(2,2,1), hL2 = plot(P(:,1),P(:,2),'k','linewidth',2);
         
         fig.CurrentAxes.Visible = 'off';
         subplot(2,2,2), hGr = plot(Gr_geo(:,1),Gr_geo(:,2),'k','linewidth',2); hold on; axis equal;
@@ -90,7 +97,7 @@ for i=1:Nsmpl
             imwrite(A,map,gifname,'gif','WriteMode','append','DelayTime',0.05);
         end
 
-        delete([hL1,hL2,hGr,hS]);
+        delete([hL1,hL2,hL3,hGr,hS]);
     end
     delete([h0,h01,h1,h2,hg,hs]);
 end

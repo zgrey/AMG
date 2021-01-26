@@ -1,6 +1,6 @@
 % Compact embedded submanifold AMG (e.g., a sphere)
 clc; close all; clearvars;
-
+addpath .\Euclidean_tools\Euclidean_Shapes\
 %% The sphere
 % mesh the entire sphere (for visualization)
 nmesh = 50; [XX,YY,ZZ] = sphere(nmesh);
@@ -22,16 +22,18 @@ rad =@(N) 0.99*rand(N,1); theta =@(N) 2*pi*rand(N,1);
 % rad =@(N) (0.75-0.25)*rand(N,1)+ 0.25; theta =@(N) pi/4*rand(N,1);
 % rad =@(N) (0.9-0.7)*rand(N,1)+ 0.7; theta =@(N) pi/2*rand(N,1);
 % rad =@(N) 0.99*rand(N,1); theta =@(N) pi/4*rand(N,1);
-% rad =@(N) 0.25*rand(N,1); theta =@(N) 2*pi*rand(N,1);
+% rad =@(N) 0.75*rand(N,1); theta =@(N) 2*pi*rand(N,1);
 
 %% Ambient map on the sphere
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
 % linear ambient function
 % a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
+% linear ambient function aligned with central tangent space
+a = [0;0;1]; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
 % quadratic ambient ridge of rank(H) = r <= floor(m/2)
 % r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
 % quadratic with preferential directions (my method is typically better)
-H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
+% H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
 % highly nonlinear ridge
 % a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
@@ -41,23 +43,30 @@ H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
 
 %% Subpsace convergence study
 % convergence study values (NN and NT are amounts, N = 2.^NN and T = 0.5.^NT are upper bounds)
-NN = 7; NT = 1; nboot = 1;
+NN = 1; NT = 1; nboot = 1;
 % combinations of N and T for convergence study
 [Ni,Ti] = meshgrid(linspace(1,NN,NN),linspace(1,NT,NT)); Ni = reshape(2.^Ni,NN*NT,1); Ti = reshape(0.1.^Ti,NN*NT,1);
+Ni = 1000;
 % precondition metric vectors for convergence study
 err = ones(NN*NT,nboot); err_emb = err;
 
-%% Karcher mean & Visualization
+%% Karcher mean
 N = max(Ni); r = rad(N); th = theta(N);
 % sample random ball in parametrization domain
 S = r.*[cos(th),sin(th)]; P = [S(:,1),S(:,2),Zcurv(S(:,1),S(:,2));];
 % initialize gradient descent optimization routine
 p0  = P(1,:); Jp = [1 0; 0 1; Zx(p0(1),p0(2)) Zy(p0(1),p0(2))]; vt = rand(1,2)*Jp'; vt = vt/norm(vt); v = 1;
 % Fletcher et al. (Algorithm 1)
-while norm(v) > 1e-8
-    v = 1/(N-1)*sum(Log(p0,P(2:end,:)),1);
+iter = 1; v = ones(1,3);
+while norm(v) > 1e-8 && iter < 1000
+    if iter == 1
+    	v = 1/(N-1)*sum(Log(p0,P(2:end,:)),1);
+    else
+        v = 1/(N-1)*sum(Log(p0,P(1:end,:)),1);
+    end
     p0 = Exp(norm(v),v,p0); 
     Jp = [1 0; 0 1; Zx(p0(1),p0(2)) Zy(p0(1),p0(2))]; vt = rand(1,2)*Jp'; vt = vt/norm(vt);
+    iter = iter + 1;
 end
 
 %% Run convergence study
@@ -117,10 +126,10 @@ Vlogx = Log(p0,P);
 % Vlog = 1/T*(Vlog2 - Vlog1);
 
 % [central diff-ladder] 
-Vlog = zeros(N,3); Nrungs = 1e4;
-for ii=1:N
-    Vlog(ii,:) = diff_ladder(P(ii,:),p0,Gt(ii,:),Exp,Log,Nrungs);
-end
+% Vlog = zeros(N,3); Nrungs = 1e4;
+% for ii=1:N
+%     Vlog(ii,:) = diff_ladder(P(ii,:),p0,Gt(ii,:),Exp,Log,Nrungs);
+% end
 
 % [Schild's ladder]
 % Vlog = zeros(N,3); Nrungs = 100;
@@ -128,14 +137,17 @@ end
 %     Vlog(ii,:) = schilds_ladder(P(ii,:),p0,Gt(ii,:),Exp,Log,Nrungs);
 % end
 
-% [angle preserving isometry] NOT WORKING
-% Vlog = zeros(N,3);
-% for ii=1:N
-%     Vlog(ii,:) = iso_angle(P(ii,:),p0,Gt(ii,:),Ux',Log);
-% end
+% [Grassmannian, Edelman et al.]
+Vlog = zeros(N,3);
+for ii=1:N
+    Ptt0 = Gr_parallel_trans(1,P(ii,:)',Log(P(ii,:),p0)',Gt(ii,:)');
+    Vlog(ii,:) = Ptt0';
+end
 
 % SVD of tangential vectors
-[U,D,~] = svd(1/sqrt(N)*Ux*Vlog',0); U = U'*Ux;
+% [U,D,~] = svd(1/sqrt(N)*Ux*Vlog',0); U = U'*Ux;
+% compute in extrinsic dimension
+[U,D,~] = svd(1/sqrt(N)*Vlog',0); U = U(:,1:2)';
 
 % compute error w.r.t Mukherjee embedding definition
 [Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
@@ -166,6 +178,7 @@ elseif NT == 1
     Rsq = 1 - sum((log10(mean(err,2)) - M*cerr).^2)/sum((log10(mean(err,2)) - mean(log10(mean(err,2)))).^2);
     fprintf('Sub. dist. N convergence rate 10^%f (R^2 = %f)\n',cerr(2),Rsq);
 end
+std_err = 1/sqrt(nboot)*std(err,1,2);
 
 %% Compute active and inactive manifold-geodesic
 % refined geodesic samples (for visualization)
@@ -200,6 +213,7 @@ pAMG = Exp(tAMG,U(1,:),p0);
 IAMG_level = Exp(2*tt,U(2,:),pAMG);
 
 %% Visualizations
+set(0,'defaulttextInterpreter','latex')
 % visualize function on sphere
 fig = figure;
 % simple filled surface
@@ -210,10 +224,11 @@ surf(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'FaceColor','interp','FaceLighting'
 % mesh(XX,YY,ZZ,reshape(F,(nmesh+1),(nmesh+1)),'EdgeColor','interp'); alpha(0.75);
 % no map, sphere only
 % mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; alpha(0); axis equal; colormap gray;
-color = caxis; hold on; axis equal; colorbar;
+color = caxis; hold on; axis equal; %colorbar;
 % random points
-ind = 1:N; if N > 500, ind = 1:500; end
-scatter3(P(ind,1),P(ind,2),P(ind,3),50,'filled','cdata',Frnd(ind),'MarkerEdgeColor','k','linewidth',1);
+ind = 1:N; if N >= 100, ind = 1:100; end
+scatter3(P(ind,1),P(ind,2),P(ind,3),15,'filled','cdata',Frnd(ind),'MarkerEdgeColor','k','linewidth',1);
+% scatter3(P(ind,1),P(ind,2),P(ind,3),100,'k.','MarkerEdgeColor','k','linewidth',1);% scatter3(P(ind,1),P(ind,2),P(ind,3),50,'filled','cdata',Frnd(ind),'MarkerEdgeColor','k','linewidth',1);
 % random gradients
 quiver3(P(ind,1),P(ind,2),P(ind,3),Gt(ind,1),Gt(ind,2),Gt(ind,3),1,'k')
 fig.CurrentAxes.Visible = 'off';
@@ -232,19 +247,20 @@ plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',2)
 % scatter3(reshape(Gset(:,:,1),k*N,1),reshape(Gset(:,:,2),k*N,1),reshape(Gset(:,:,3),k*N,1),'k')
 
 % visualize log map vectors
-quiver3(repmat(p0(1),N,1),repmat(p0(2),N,1),repmat(p0(3),N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
+% quiver3(repmat(p0(1),N,1),repmat(p0(2),N,1),repmat(p0(3),N,1),Vlog(:,1),Vlog(:,2),Vlog(:,3),1,'b','linewidth',1);
 % visualize new active manifold-geodesic basis
 quiver3(p0(1),p0(2),p0(3),U(1,1),U(1,2),U(1,3),1,'k','linewidth',2);
 quiver3(p0(1),p0(2),p0(3),U(2,1),U(2,2),U(2,3),1,'k--','linewidth',2);
 % visualize Mukherjee embedding projection 
-quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'r','linewidth',2);
+quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'c--','linewidth',3);
 % visualize PGA basis
-quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux(:,3),1,'color',0.5*ones(1,3),'linewidth',2);
+% quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux(:,3),1,'color',0.5*ones(1,3),'linewidth',2);
 
 % visualize active and inactive manifold-geodesic
-plot3(AMG(:,1),AMG(:,2),AMG(:,3),'k','linewidth',2);
+plot3(AMG(:,1),AMG(:,2),AMG(:,3),'k','linewidth',4);
 plot3(IAMG(:,1),IAMG(:,2),IAMG(:,3),'k--','linewidth',2);
-plot3(EmbG(:,1),EmbG(:,2),EmbG(:,3),'r','linewidth',2);
+plot3(EmbG(:,1),EmbG(:,2),EmbG(:,3),'c--','linewidth',3);
+set(gca,'Xlim',[-3,3]);
 % visualize inactive active manifold-geodesic at tAMG
 plot3(IAMG_level(:,1),IAMG_level(:,2),IAMG_level(:,3),'--','linewidth',2,'color',0.5*ones(1,3));
 
@@ -275,11 +291,11 @@ plot(tgr,Func(Exp(tgr,U(2,:),p0)),'k--','linewidth',2);
 % plot IAMG level set approximation
 plot(tgr,Func(Exp(tgr,U(2,:),pAMG)),'--','linewidth',2,'color',0.5*ones(1,3));
 % plot Muhkerjee embedding geodesic
-plot(tgr,Func(Exp(tgr,W',p0)),'r','linewidth',2);
+plot(tgr,Func(Exp(tgr,W',p0)),'c--','linewidth',3);
 % scatter plot over inner products of Log projection (shadow plot)
 scatter(Gy(:,1),Frnd,50,'filled','cdata',Frnd); caxis(color);
-ylabel 'f(Exp_x(t; v))'; xlabel 't';
-
+title('$$(f \circ exp_{p_0})(tw_1)$$','interpreter','latex','fontsize',20); xlabel('$$t$$','interpreter','latex','fontsize',20);
+set(gca,'FontSize',20)
 % Convergence of subspace distance
 if NN ~= 1 && NT ~= 1
     % contour plot of linear fit to log10(err) for convergence rate estimates
@@ -298,8 +314,11 @@ if NN ~= 1 && NT ~= 1
     xlabel('$$\log_{10}(N)$$','Interpreter','latex'); ylabel('$$\log_{10}(T)$$','Interpreter','latex'); axis square; axis([min(log10(Ni)),max(log10(Ni)),min(log10(Ti)),max(log10(Ti))]);
     title(['$$\log_{10}\left(\Vert\hat{W_',num2str(1),'}\hat{W_',num2str(1),'}^T - \hat{U_',num2str(1),'}\hat{U_',num2str(1),'}^T\Vert_2\right)$$'],'Interpreter','latex');
 elseif NN ~= 1
-    figure; loglog(Ni,mean(err,2),'ko-','linewidth',2,'MarkerSize',8); hold on; grid on;
-    err_lb = min(err,[],2); err_ub = max(err,[],2);
-    h = fill([Ni; Ni(end:-1:1)],[err_lb; err_ub(end:-1:1)],0.5*ones(1,3)); h.FaceAlpha = 0.25;
-    xlabel 'N'; ylabel 'subspace distance'
+    figure; 
+    err_lb = min(err,[],2); err_ub = max(err,[],2); std_err1 = mean(err,2) + 3*std_err; std_err2 = mean(err,2) + 6*std_err;
+    loglog(Ni,mean(err,2),'ko-','linewidth',2,'MarkerSize',8); hold on; grid on;
+%     h = fill([Ni; Ni(end:-1:1)],[err_lb; err_ub(end:-1:1)],0.5*ones(1,3)); h.FaceAlpha = 0.25; 
+    h = fill([Ni; Ni(end:-1:1)],[mean(err,2) - 3*std_err; std_err1(end:-1:1)],0.5*ones(1,3)); h.FaceAlpha = 0.25;
+    h = fill([Ni; Ni(end:-1:1)],[mean(err,2) - 6*std_err; std_err2(end:-1:1)],0.5*ones(1,3)); h.FaceAlpha = 0.25;
+    xlabel '$$N$$'; ylabel 'Subspace Distance'
 end

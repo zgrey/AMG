@@ -20,9 +20,9 @@ NN = 250;
 % PP = Pshp(linspace(0,1,4)'); tru_crv = shp_curv(linspace(0,1,NN)');
 
 % 4-point ellipse test case
-G = [cos(pi/4) -sin(pi/4);sin(pi/4) cos(pi/4)];
-scl = 2; PP = [scl*cos(0:0.25*2*pi:2*pi)',sin(0:0.25*2*pi:2*pi)']*G'; 
-tt = linspace(0,1,NN); tru_crv = scl./( scl^2*sin(2*pi*tt).^2 + cos(2*pi*tt).^2).^(3/2);
+% G = [cos(pi/4) -sin(pi/4);sin(pi/4) cos(pi/4)];
+% scl = 2; PP = [scl*cos(0:0.25*2*pi:2*pi)',sin(0:0.25*2*pi:2*pi)']*G'; 
+% tt = linspace(0,1,NN); tru_crv = scl./( scl^2*sin(2*pi*tt).^2 + cos(2*pi*tt).^2).^(3/2);
 
 %% 3D circular embedding
 % get default options
@@ -43,7 +43,7 @@ plot(PP(:,1),PP(:,2),'ko','markersize',8);
 plot(emb.pts(:,1),emb.pts(:,2),'k','linewidth',1);
 plot(emb.nom.pts(:,1),emb.nom.pts(:,2),'k*')
 % plot unit normals
-% quiver(emb.pts(:,1),emb.pts(:,2),emb.nml(:,1),emb.nml(:,2),1,'k');
+quiver(emb.pts(:,1),emb.pts(:,2),emb.nml(:,1),emb.nml(:,2),1,'k');
 axis equal; fig.CurrentAxes.Visible = 'off';
 
 % curvature

@@ -13,6 +13,8 @@ J = @(u,v) [-sin(u).*sin(v), cos(u).*cos(v);...
 Exp = @(t,Vt,P) kron(P,cos(t)) + kron(Vt./sqrt(sum(Vt.^2,2)),sin(t));
 % logarithmic map
 Log = @(p,P) acos(P*p').*(P - P*p'.*repmat(p,size(P,1),1))./sqrt(sum((P - P*p'.*repmat(p,size(P,1),1)).^2,2));
+% distances between embedded points
+dS = @(p,q) acos(p*q');
 
 %% Ambient map on the sphere
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
@@ -222,3 +224,75 @@ for i=1:Ncurv
     
     delete([h1,h2,h3,h4,h5]);
 end
+
+%% Karcher mean, PGA, Projection, & Submanifold
+fig = figure; N = 10; rng(42); NPGA = 100;
+% sample random ball in parametrization domain
+mu = [0 0]; Sigma = [0.5 0.15; 0.15 0.5]; R = chol(Sigma);
+s = repmat(mu,N,1) + randn(N,2)*R;
+P = X(s);
+% initialize gradient descent optimization routine
+p0  = P(1,:);
+% Fletcher et al. (Algorithm 1)
+iter = 1; v = ones(1,3);
+while norm(v) > 1e-8 && iter < 1000
+    if iter == 1
+    	v = 1/(N-1)*sum(Log(p0,P(2:end,:)),1);
+    else
+        v = 1/N*sum(Log(p0,P),1);
+    end
+    p0 = Exp(norm(v),v,p0); 
+    iter = iter + 1;
+end
+
+% PGA
+U = Log(p0,P);
+[PGA,PGAeigs] = svd(1/sqrt(N)*U','econ');
+trnd = randn(NPGA,2); Ptan = [p0 + PGA(:,1)'; p0 + PGA(:,2)'; p0 - PGA(:,1)'; p0 - PGA(:,2)'; p0 + PGA(:,1)'];
+tellp = 2*[cos(linspace(0,1,NPGA)'*2*pi) sin(linspace(0,1,NPGA)'*2*pi)];
+Vrnd = trnd*(PGA(:,1:2)*PGAeigs(1:2,1:2))'; PGArnd = zeros(NPGA,3);
+Vellp = tellp*(PGA(:,1:2)*PGAeigs(1:2,1:2))'; PGAellp = zeros(NPGA,3);
+for i=1:NPGA
+    PGArnd(i,:) = Exp(norm(Vrnd(i,:)), Vrnd(i,:), p0);
+    PGAellp(i,:) = Exp(norm(Vellp(i,:)), Vellp(i,:), p0);
+end
+
+% Projection
+tproj = zeros(N,2); tprojPGA = zeros(NPGA,2);
+for i=1:N
+    tproj(i,1) = fminbnd(@(t) dS(Exp(t,PGA(:,1)',p0),P(i,:)),-3,3);
+    tproj(i,2) = fminbnd(@(t) dS(Exp(t,PGA(:,2)',p0),P(i,:)),-3,3);
+    tprojPGA(i,1) = fminbnd(@(t) dS(Exp(t,PGA(:,1)',p0),PGArnd(i,:)),-3,3);
+    tprojPGA(i,2) = fminbnd(@(t) dS(Exp(t,PGA(:,2)',p0),PGArnd(i,:)),-3,3); 
+end
+
+mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray;
+% random points
+% h = scatter3(P(:,1),P(:,2),P(:,3),50,'filled','MarkerEdgeColor','k','linewidth',1);
+% visualize Karcher mean
+scatter3(p0(1),p0(2),p0(3),75,'k','filled','MarkerEdgeColor','k','linewidth',2);
+% visualize tangent space at mean
+plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',1)
+quiver3(p0(1),p0(2),p0(3),PGA(1,1),PGA(2,1),PGA(3,1),0,'k','linewidth',2)
+quiver3(p0(1),p0(2),p0(3),PGA(1,2),PGA(2,2),PGA(3,2),0,'k','linewidth',2)
+plot3(Vellp(:,1)+p0(1),Vellp(:,2)+p0(2),Vellp(:,3)+p0(3),'k','linewidth',2);
+% Log map of random points
+% quiver3(repmat(p0(1),10,1),repmat(p0(2),N,1),repmat(p0(3),N,1),U(:,1),U(:,2),U(:,3),0,'color',h.CData);
+% Visualize PGA submanifolds
+t = linspace(-3,3,100)'; PGAgeo1 = Exp(t*PGAeigs(1,1),PGA(:,1)',p0); 
+plot3(PGAgeo1(:,1),PGAgeo1(:,2),PGAgeo1(:,3),'k','linewidth',2);
+PGAgeo2 = Exp(t*PGAeigs(2,2),PGA(:,2)',p0); 
+plot3(PGAgeo2(:,1),PGAgeo2(:,2),PGAgeo2(:,3),'k','linewidth',2);
+% scatter3(PGArnd(:,1),PGArnd(:,2),PGArnd(:,3),'k.');
+plot3(PGAellp(:,1),PGAellp(:,2),PGAellp(:,3),'k--','linewidth',2);
+% Visualize projections to first 
+% t = linspace(0,1,100)';
+% for i = 1:N
+%     Vprj = Log(P(i,:),Exp(tproj(i,1),PGA(:,1)',p0));
+%     prj_geo = Exp(t*norm(Vprj),Vprj,P(i,:));
+%     plot3(prj_geo(:,1),prj_geo(:,2),prj_geo(:,3),'linewidth',2,'color',h.CData);
+% end
+
+fig.CurrentAxes.Visible = 'off';
+
+% build the normal neighborhood

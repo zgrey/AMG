@@ -12,11 +12,11 @@ maxi   = 20;    % max number of iterations
 % initial shape
 theta = linspace(0,2*pi,N)';
 % Schulz's initial shape
-% c0 = 1/2*[cos(theta)-0.15*abs(1-sin(2*theta)).*cos(theta),sin(theta)-0.15*abs(1-cos(2*theta)).*cos(theta)];
+c0 = 1/2*[cos(theta)-0.15*abs(1-sin(2*theta)).*cos(theta),sin(theta)-0.15*abs(1-cos(2*theta)).*cos(theta)];
 % circle
 % c0 = [cos(theta), sin(theta)];
 % tall ellipse
-a = 1; b = 2; c0 =[a*cos(theta),b*sin(theta)];
+% a = 1; b = 2; c0 =[a*cos(theta),b*sin(theta)];
 % Airfoil
 % load turbine_airfoil.mat; x0 = [mean(PP(:,1)),mean(PP(:,2))]; c0 = PP - x0;
 
