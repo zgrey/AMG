@@ -1,5 +1,6 @@
 % sphere visualizations
 close all; clc;
+
 %% The sphere
 % mesh the entire sphere
 nmesh = 50; [XX,YY,ZZ] = sphere(nmesh);
@@ -19,7 +20,7 @@ dS = @(p,q) acos(p*q');
 %% Ambient map on the sphere
 m = 3; XY = [reshape(XX,(nmesh+1)^2,1),reshape(YY,(nmesh+1)^2,1),reshape(ZZ,(nmesh+1)^2,1)]; rng(47);
 % linear ambient function
-a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1),1);
+a1 = 2*rand(m,1)-1; a1 = a1/norm(a1); Func = @(XY) XY*a1; Grad = @(XY) repmat(a1',size(XY,1),1);
 % quadratic ambient ridge of rank(H) = r <= floor(m/2)
 % r = 1; H = zeros(m); H(floor(m/2):floor(m/2)+r-1,floor(m/2):floor(m/2)+r-1) = eye(r); Func = @(X) sum((X*H).*X,2); Grad = @(X) X*H;
 % highly nonlinear ridge
@@ -193,7 +194,7 @@ for i=1:Ncurv
     U1(i,:) = U(1,:); U2(i,:) = U(2,:);
     
     % project ridge direction into each tangent space
-    Proj_a = (eye(3) - p0(i,:)'*p0(i,:))*a;
+    Proj_a = (eye(3) - p0(i,:)'*p0(i,:))*a1;
     % compute error
     err(i) = 1 - abs(U1(i,:)*Proj_a);
     % fix direction
@@ -215,11 +216,11 @@ for i=1:Ncurv
 
     % build gif
     figure(fig5); frame = getframe(fig5);
-    [A,map] = rgb2ind(frame2im(frame),256);
+    [A1,map] = rgb2ind(frame2im(frame),256);
     if i == 1
-        imwrite(A,map,filename,'gif','LoopCount',Inf,'DelayTime',0.1);
+        imwrite(A1,map,filename,'gif','LoopCount',Inf,'DelayTime',0.1);
     else
-        imwrite(A,map,filename,'gif','WriteMode','append','DelayTime',0.1);
+        imwrite(A1,map,filename,'gif','WriteMode','append','DelayTime',0.1);
     end
     
     delete([h1,h2,h3,h4,h5]);

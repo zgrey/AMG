@@ -35,7 +35,7 @@ a = [0;0;1]; a = a/norm(a); Func = @(XY) XY*a; Grad = @(XY) repmat(a',size(XY,1)
 % quadratic with preferential directions (my method is typically better)
 % H = diag(linspace(1,m,m)); Func = @(X) sum((X*H).*X,2); Grad = @(X) 2*X*H;
 % highly nonlinear ridge
-% a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
+a = 2*rand(m,1)-1; a = a/norm(a); Func = @(XY) sin(2*pi*XY*a) + cos(pi/2*XY*a); Grad = @(XY) kron(sum(pi*cos(pi*XY*a) - pi/2*sin(pi/2*XY*a),2),sum(a,2)');
 % highly nonlinear approximate ridge
 % w = 0.1; aa = 2*rand(m,1)-1; aa = aa/norm(aa); [A,~] = svd(aa); Func = @(XY) sum(sin(pi*XY*aa) + cos(pi/2*XY*aa),2) + w*sum((sin(pi*XY))*A(:,2:end),2); Grad = @(XY) kron(sum(pi*cos(pi*XY*aa) - pi/2*sin(pi/2*XY*aa),2),sum(aa,2)') + w*sum(pi*cos(pi*XY)*A(:,2:end),2)/(m-1); 
 % highly nonlinear non-ridge
@@ -145,12 +145,17 @@ for ii=1:N
 end
 
 % SVD of tangential vectors
+<<<<<<< HEAD
+=======
+disp('Computing important directions...');
+% compute in intrinsic dimension
+>>>>>>> 7fcd48e6db8fb1838811f921a5bcd742bfcb0bbe
 % [U,D,~] = svd(1/sqrt(N)*Ux*Vlog',0); U = U'*Ux;
 % compute in extrinsic dimension
 [U,D,~] = svd(1/sqrt(N)*Vlog',0); U = U(:,1:2)';
 
 % compute error w.r.t Mukherjee embedding definition
-[Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,1); W = W./norm(W);
+[Uemb,~,~] = svd(Grnd'); W = (eye(3) - p0'*p0)*Uemb(:,2); %W = W./norm(W);
 if U(1,:)*W < 0, W = -W; end
 % subspace distance to the embedding definition
 if exist('a','var')
@@ -252,7 +257,12 @@ plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',2)
 quiver3(p0(1),p0(2),p0(3),U(1,1),U(1,2),U(1,3),1,'k','linewidth',2);
 quiver3(p0(1),p0(2),p0(3),U(2,1),U(2,2),U(2,3),1,'k--','linewidth',2);
 % visualize Mukherjee embedding projection 
+<<<<<<< HEAD
 quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'c--','linewidth',3);
+=======
+quiver3(p0(1),p0(2),p0(3),W(1),W(2),W(3),1,'r','linewidth',2);
+quiver3(p0(1)*ones(3,1),p0(2)*ones(3,1),p0(3)*ones(3,1),Uemb(1,:)',Uemb(2,:)',Uemb(3,:)','r--','linewidth',2);
+>>>>>>> 7fcd48e6db8fb1838811f921a5bcd742bfcb0bbe
 % visualize PGA basis
 % quiver3(repmat(p0(1),2,1),repmat(p0(2),2,1),repmat(p0(3),2,1),Ux(:,1),Ux(:,2),Ux(:,3),1,'color',0.5*ones(1,3),'linewidth',2);
 

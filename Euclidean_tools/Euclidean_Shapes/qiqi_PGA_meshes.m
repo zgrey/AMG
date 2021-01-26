@@ -3,11 +3,11 @@
 clc; close all; clearvars; rng(42);
 
 addpath ~/AMG/Euclidean_tools/Euclidean_Shapes/;
-addpath ~/RESEARCH/SHDP/;
+cd ~/RESEARCH/SHDP/;
 
-plt_flg = 0; msh_flg = 0;
+plt_flg = 1; msh_flg = 1; plt_modes = 10;
 % things to modify
-Nldmk = 1000; Nrnd = 1000; rPGA = 10; tub = 1.5; tlb = -1.5;
+Nldmk = 1000; Nrnd = 1000; rPGA = 1000; tub = 1; tlb = -1;
 
 %% read nominal points from file
 dirstruct  = dir('~/airfoil_coordinate_database/coordinates/'); Naf = size(dirstruct,1)-2; 
@@ -17,7 +17,7 @@ dirstruct  = dir('~/airfoil_coordinate_database/coordinates/'); Naf = size(dirst
 P = zeros(Nldmk,2,Naf); b = zeros(2,1,Naf); i_fail = zeros(Naf,1); U = zeros(2*Nldmk,Naf);
 M = zeros(2,2,Naf); Minv = zeros(2,2,Naf); n = zeros(Naf,1); not_tan = zeros(Naf,1);
 for i=1:Naf
-    clc; disp([num2str(i),'/',num2str(Naf),' Shapes Complete']);
+    clc; disp([num2str(i),'/',num2str(Naf),' Emb. Rep. shapes Complete']);
     % obtain nominal landmarks
     try 
         P0 = importairfoil([dirstruct(2+i).folder,'/',dirstruct(2+i).name]);
@@ -61,20 +61,21 @@ end
 
 % build section to original average scales (using average... because why not...)
 proj_inv = sqrt(Nldmk - 1)*mean(Minv,3); 
-% build section to original scales using Karcher mean
-V = proj_inv; iter = 0; muM = eye(2);
-while norm(V,'fro') >= 1e-8 && iter <= 5
-    tic; sum_log = 0;
-    for i=1:Naf
-        sum_log = logm(M(:,:,i)*V) + sum_log;
-    end
-    V = V - 1/Naf*V*sum_log;
-    muM = Gr_exp(1,muM,V);
-    disp(['||V||_f = ',num2str(norm(V,'fro')),' ... ',num2str(toc),' sec.']);
-    iter = iter + 1;
-end
 
-muP0 = muP / muM';
+% build section to original scales using Karcher mean
+% disp('Computing Karcher mean for local section...');
+% V = proj_inv; iter = 0; muM = eye(2);
+% while norm(V,'fro') >= 1e-8 && iter <= 5
+%     tic; sum_log = 0;
+%     for i=1:Naf
+%         sum_log = logm(M(:,:,i)*V) + sum_log;
+%     end
+%     V = V - 1/Naf*V*sum_log;
+%     muM = Gr_exp(1,muM,V);
+%     disp(['||V||_f = ',num2str(norm(V,'fro')),' ... ',num2str(toc),' sec.']);
+%     iter = iter + 1;
+% end
+% muP0 = muP / muM';
 
 %% PGA
 disp('Computing PGA...')
@@ -83,13 +84,15 @@ for i=1:Naf
     U(:,i) = reshape(Ui,2*Nldmk,1);
 end
 [PGA,PGAeigs] = svd(1/sqrt(Naf)*U);
-% trnd = tlb + (tub-tlb).*rand(Nrnd,rPGA);
-trnd = randn(Nrnd,rPGA);
+% Uniform
+trnd = tlb + (tub-tlb).*rand(Nrnd,rPGA);
+% Gaussian
+% trnd = randn(Nrnd,rPGA);
 
 %% Plot PGA modes
 fig = figure; PGAW = zeros(Nldmk,2,rPGA); PGA_fwd = zeros(Nldmk,2,rPGA);
 sub = 10;
-for i=1:rPGA
+for i=1:plt_modes
     PGAW(:,:,i) = reshape((PGA(:,i)*PGAeigs(i,i)),Nldmk,2);
     PGA_fwd(:,:,i) = Gr_exp(1,muP,PGAW(:,:,i));
     subplot(2,5,i), bndplot(fig,muP(:,1),muP(:,2),sqrt(PGAW(:,1,i).^2 + PGAW(:,2,i).^2)); axis equal; hold on;
@@ -117,7 +120,7 @@ for i=1:Nrnd
         h = plot(Pts(:,1,i),Pts(:,2,i),'k','linewidth',2); axis equal; hold on;
 
         % print figure
-        print(['./figs_PGA_airfoils/airfoil_',num2str(i),'.png'],'-dpng')
+        print(fig,'-dpng',['./figs_PGA_airfoils/airfoil_',num2str(i),'.png'])
         % clear plot
         delete(h)
         
@@ -147,7 +150,7 @@ for i=1:Nrnd
         meshGMF = ReadGMF('airfoil.mesh');
         meshGMF = meshPrepro(meshGMF);
         meshSU2 = convertGMFtoSU2(meshGMF);
-        WriteSU2_airfoil(meshSU2, ['./PGA_meshes/airfoil_',num2str(i),'.su2']);
+        WriteSU2_airfoil(meshSU2, ['./meshes/airfoil_',num2str(i),'.su2']);
 
         tocp = toc;
         % print time stats
@@ -160,4 +163,4 @@ for i=1:Nrnd
     end
 end
 close all;
-save('./qiqi_PGA_meshes.mat');
+save('~/RESEARCH/AMG_DATA/qiqi_PGA_meshes.mat');
