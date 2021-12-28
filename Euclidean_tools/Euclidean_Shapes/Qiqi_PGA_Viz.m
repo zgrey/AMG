@@ -5,9 +5,9 @@
 clc; close all; clearvars; rng(42);
 
 % Linux
-% HOME = '~/airfoil_coordinate_database';
+HOME = '~/airfoil_coordinate_database';
 % Windows
-HOME = 'C:\Users\zgrey\Documents\MATLAB\my_airfoil_coords';
+%HOME = 'C:\Users\zgrey\Documents\MATLAB\my_airfoil_coords';
 
 % things to modify
 plt_flg = 1;

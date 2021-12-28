@@ -271,7 +271,7 @@ mesh(XX,YY,ZZ,ones(size(ZZ))); hold on; axis equal; colormap gray;
 % random points
 % h = scatter3(P(:,1),P(:,2),P(:,3),50,'filled','MarkerEdgeColor','k','linewidth',1);
 % visualize Karcher mean
-scatter3(p0(1),p0(2),p0(3),75,'k','filled','MarkerEdgeColor','k','linewidth',2);
+%scatter3(p0(1),p0(2),p0(3),75,'k','filled','MarkerEdgeColor','k','linewidth',2);
 % visualize tangent space at mean
 plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'k','linewidth',1)
 quiver3(p0(1),p0(2),p0(3),PGA(1,1),PGA(2,1),PGA(3,1),0,'k','linewidth',2)
@@ -281,9 +281,9 @@ plot3(Vellp(:,1)+p0(1),Vellp(:,2)+p0(2),Vellp(:,3)+p0(3),'k','linewidth',2);
 % quiver3(repmat(p0(1),10,1),repmat(p0(2),N,1),repmat(p0(3),N,1),U(:,1),U(:,2),U(:,3),0,'color',h.CData);
 % Visualize PGA submanifolds
 t = linspace(-3,3,100)'; PGAgeo1 = Exp(t*PGAeigs(1,1),PGA(:,1)',p0); 
-plot3(PGAgeo1(:,1),PGAgeo1(:,2),PGAgeo1(:,3),'k','linewidth',2);
+%plot3(PGAgeo1(:,1),PGAgeo1(:,2),PGAgeo1(:,3),'k','linewidth',2);
 PGAgeo2 = Exp(t*PGAeigs(2,2),PGA(:,2)',p0); 
-plot3(PGAgeo2(:,1),PGAgeo2(:,2),PGAgeo2(:,3),'k','linewidth',2);
+%plot3(PGAgeo2(:,1),PGAgeo2(:,2),PGAgeo2(:,3),'k','linewidth',2);
 % scatter3(PGArnd(:,1),PGArnd(:,2),PGArnd(:,3),'k.');
 plot3(PGAellp(:,1),PGAellp(:,2),PGAellp(:,3),'k--','linewidth',2);
 % Visualize projections to first 
@@ -297,3 +297,50 @@ plot3(PGAellp(:,1),PGAellp(:,2),PGAellp(:,3),'k--','linewidth',2);
 fig.CurrentAxes.Visible = 'off';
 
 % build the normal neighborhood
+
+%% smooth path
+addpath ./Euclidean_tools/Euclidean_Shapes/
+t = linspace(0,pi/8,10)'; sc = [2*t, pi*(sin(t)+1)+pi];
+tt = linspace(0,pi/8,100)'; ssc = [2*tt, pi*(sin(tt)+1)+pi];
+pt = X(sc); ppt = X(ssc);
+scatter3(pt(:,1),pt(:,2),pt(:,3),25,'k','filled','MarkerEdgeColor','k','linewidth',2);
+plot3(ppt(:,1),ppt(:,2),ppt(:,3),'r','linewidth',2);
+
+% Karcher mean
+% initialize gradient descent optimization routine
+p0  = pt(1,:);
+% Fletcher et al. (Algorithm 1)
+iter = 1; v = ones(1,3); N = length(t);
+while norm(v) > 1e-8 && iter < 1000
+    if iter == 1
+    	v = 1/(N-1)*sum(Log(p0,pt(2:end,:)),1);
+    else
+        v = 1/(N-1)*sum(Log(p0,pt(1:end,:)),1);
+    end
+    p0 = Exp(norm(v),v,p0); 
+    iter = iter + 1;
+    disp(iter)
+end
+[V,~] = eigs(p0'*p0); v1 = V(:,2); v2 = V(:,3);
+scatter3(p0(1), p0(2), p0(3),50,'b','filled')
+quiver3(ones(2,1)*p0(1), ones(2,1)*p0(2), ones(2,1)*p0(3), ...
+       [v1(1); v2(1)], [v1(2); v2(2)], [v1(3); v2(3)],'b');
+Ptan = [p0 + v1'; p0 + v2'; p0 - v1'; p0- v2'; p0 + v1';];
+plot3(Ptan(:,1),Ptan(:,2),Ptan(:,3),'b','linewidth',1);
+
+% Parallel transport
+for i=1:length(t)
+    Ptt01(:,i) = Gr_parallel_trans(1,p0',Log(p0, pt(i,:))', v1);
+    Ptt02(:,i) = Gr_parallel_trans(1,p0',Log(p0, pt(i,:))', v2);
+end
+quiver3(pt(:,1), pt(:,2), pt(:,3), Ptt01(1,:)', Ptt01(2,:)', Ptt01(3,:)','k')
+quiver3(pt(:,1), pt(:,2), pt(:,3), Ptt02(1,:)', Ptt02(2,:)', Ptt02(3,:)','k')
+N_pert = 3; pt_pert = zeros(length(t),3); pt_pert(1:N_pert,:) = pt(1:N_pert,:); a = rand; b = rand;
+for i=N_pert+1:length(t)
+    pt_pert(i,:) = Exp(0.1, a*Ptt01(:,i)' + b*Ptt02(:,i)', pt(i,:));
+    v_pert = Log(pt_pert(i-1,:), pt_pert(i,:));
+    pert_curv = Exp(norm(v_pert)*linspace(0,1,50)', v_pert, pt_pert(i-1,:));
+    plot3(pert_curv(:,1), pert_curv(:,2), pert_curv(:,3),'r--','linewidth',2);
+end
+scatter3(pt_pert(:,1), pt_pert(:,2), pt_pert(:,3),35, 'k');
+

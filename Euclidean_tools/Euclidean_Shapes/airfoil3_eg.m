@@ -1,6 +1,7 @@
 % turbine airfoil 3D embedding example
 clc; close all; clearvars; rng(42);
-load turbine_airfoil.mat;
+%load turbine_airfoil.mat; 
+load S801.mat; %PPnew = [PP(32:end,:); PP(1:31,:)]; PP = PPnew;
 NN = 250;
 
 % 4-point circle test case (coordinate aligned)
@@ -80,7 +81,7 @@ t = 1/(ub-lb)*t0;
 % Build spline
 % x_spl = csape(t,P(:,1),'periodic');
 % y_spl = csape(t,P(:,2),'periodic');
-xy_spl = csape(t,P','periodic');
+xy_spl = csape(t,P','variational');
 tt = linspace(0,max(t),NN)';
 % recompute points
 % P = [ppval(x_spl,tt), ppval(y_spl,tt)];
@@ -128,9 +129,9 @@ figure;
 if exist('tru_crv','var')
 semilogy(tt,tru_crv,'k','linewidth',2); hold on;
 end
-h2 = semilogy(tt,curv2,'--','linewidth',2);
-h1 = semilogy(emb.t,emb.curv,'--','linewidth',2,'markersize',2); hold on; grid on;
+h1 = semilogy(emb.t,emb.curv,'-','linewidth',2,'markersize',2); hold on; grid on;
 semilogy(emb.nom.t,emb.nom.curv,'o','color',h1.Color,'linewidth',2);
+h2 = semilogy(tt,curv2,'-','linewidth',2);
 semilogy(t,nom_curv2,'d','color',h2.Color,'linewidth',2)
 xlabel '$$t$$'; ylabel '$$ \hat{\kappa}(t)$$';
 % legend('emb. rep.','reg. spline');

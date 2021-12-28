@@ -6,6 +6,7 @@ function emb = embrep3(P0,N,smpl,varargin)
 % set default options
 opts = struct('ThetaSpline','complete',...
               'AffineTrans','LA',...
+              'TE','sharp',...
               'M',[],...
               'b',[],...
               'Minv',[]);
@@ -80,7 +81,11 @@ elseif strcmp(opts.ThetaSpline,'pchip')
     emb.th.spl = pchip(emb.TF.t,emb.TF.th);
 end
 % periodic spline of inner product
-emb.alph.spl = csape(emb.TF.t,emb.TF.alph,'periodic');
+if strcmp(opts.TE,'sharp')
+    emb.alph.spl = csape(emb.TF.t,emb.TF.alph,'variational');
+elseif strcmp(opts.TE,'round')
+    emb.alph.spl = csape(emb.TF.t,emb.TF.alph,'periodic');
+end
 
 %% Sampling
 % reevaluate shape at N landmarks using embedding representation
