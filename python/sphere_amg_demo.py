@@ -167,24 +167,85 @@ def _geodesic(p0, direction, t):
     return np.array([amg.sphere_exp(p0, direction, ti) for ti in t])
 
 
-def figure_sphere_3d(func, res, n_show=45, arc=1.25, show_embedding=True, path=None):
-    """The function on the sphere with samples, gradients, and geodesics."""
-    p0, P, Gt = res.p0, res.P, res.Gt
-    r = 1.01  # float overlays just above the surface
+def _hemisphere_grad_grid(func, n=9, rad_max=0.92):
+    """Sparse regular grid of upper-hemisphere points (lifted from the
+    parametrisation disk) and their tangential gradients."""
+    g = np.linspace(-rad_max, rad_max, n)
+    X, Y = np.meshgrid(g, g)
+    inside = (X**2 + Y**2) <= rad_max**2
+    x, y = X[inside], Y[inside]
+    z = np.sqrt(np.clip(1 - x**2 - y**2, 0.0, 1.0))
+    Pg = np.column_stack([x, y, z])
+    Pg /= np.linalg.norm(Pg, axis=1, keepdims=True)
+    Gg = amg.project_tangent(func.grad(Pg), Pg)
+    return Pg, Gg
+
+
+def _view_direction(elev, azim):
+    """Unit vector from the origin toward the camera for a matplotlib 3-D view
+    (used to split artists into near / far for hand-managed occlusion)."""
+    e, a = np.radians(elev), np.radians(azim)
+    return np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
+
+
+def figure_sphere_3d(func, res, arc=1.25, n_grid=9, n_sample=12,
+                     show_embedding=True, seed=0, path=None):
+    """The function on the sphere with a sparse grid of tangential gradients
+    (near side over the surface, far side occluded by it), the active/inactive/
+    embedding geodesics, and a ringed random subset marking the Monte Carlo
+    sample used for the approximation."""
+    p0 = res.p0
+    r = 1.01  # float the curves/markers just above the surface
+
+    # camera direction, to split the gradient grid into near (drawn over the
+    # surface) and far (drawn under it, so the surface occludes it)
+    elev = 24
+    az = np.degrees(np.arctan2(res.U_active[1], res.U_active[0])) + 45
+    view = _view_direction(elev, az)
 
     def geo(curve, key, z):
-        # white halo underneath so the curve reads over the coloured sphere
         st = TRACE[key]
         ax.plot(*curve.T, "-", color="w", lw=st["lw"] + st["halo"], zorder=z, alpha=0)
         ax.plot(*curve.T, color=st["color"], ls=st["ls"], lw=st["lw"], zorder=z + 1)
 
     fig = plt.figure(figsize=(6.6, 6.4))
     ax = fig.add_subplot(111, projection="3d")
-    ax.computed_zorder = False  # respect our explicit zorder (curves over surface)
+    ax.computed_zorder = False  # respect explicit zorder (hand-managed occlusion)
 
-    # --- upper hemisphere: coloured by the function (the admissible domain) ---
     nu, nv = 72, 34
     u = np.linspace(0, 2 * np.pi, nu)
+
+    # --- lower hemisphere: grid only (inadmissible region), behind everything ---
+    v_dn = np.linspace(np.pi / 2, np.pi, nv)
+    ax.plot_wireframe(np.outer(np.cos(u), np.sin(v_dn)),
+                      np.outer(np.sin(u), np.sin(v_dn)),
+                      np.outer(np.ones_like(u), np.cos(v_dn)),
+                      color="0.45", linewidth=0.5, alpha=0.6, rstride=2, cstride=2,
+                      zorder=0)
+
+    # --- sparse gradient grid, split near / far for occlusion ---
+    Pg, Gg = _hemisphere_grad_grid(func, n=n_grid)
+    near = (Pg @ view) > 0
+    rng = np.random.default_rng(seed)
+    sub = np.zeros(len(Pg), bool)
+    sub[rng.choice(len(Pg), size=min(n_sample, len(Pg)), replace=False)] = True
+
+    def draw_grads(mask, z):
+        if not np.any(mask):
+            return
+        ax.quiver(Pg[mask, 0], Pg[mask, 1], Pg[mask, 2],
+                  Gg[mask, 0], Gg[mask, 1], Gg[mask, 2],
+                  length=0.20, color="0.12", linewidth=1.4, normalize=False,
+                  alpha=0.9, zorder=z)
+        ring = mask & sub                      # Monte Carlo sample: ring the feet
+        if np.any(ring):
+            ax.scatter(Pg[ring, 0], Pg[ring, 1], Pg[ring, 2], s=150,
+                       facecolors="none", edgecolors="k", linewidths=2.0,
+                       depthshade=False, zorder=z + 0.5)
+
+    draw_grads(~near, z=1)                      # far side (will be occluded)
+
+    # --- upper hemisphere surface (occludes the far-side gradients) ---
     v_up = np.linspace(0, np.pi / 2, nv)
     Xu = np.outer(np.cos(u), np.sin(v_up))
     Yu = np.outer(np.sin(u), np.sin(v_up))
@@ -192,51 +253,29 @@ def figure_sphere_3d(func, res, n_show=45, arc=1.25, show_embedding=True, path=N
     Fs = func.f(np.column_stack([Xu.ravel(), Yu.ravel(), Zu.ravel()])).reshape(nu, nv)
     facec = CMAP((Fs - Fs.min()) / (np.ptp(Fs) + 1e-30))
     ax.plot_surface(Xu, Yu, Zu, facecolors=facec, rstride=1, cstride=1,
-                    linewidth=0, antialiased=True, alpha=0.9, shade=False)
+                    linewidth=0, antialiased=True, alpha=0.9, shade=False, zorder=2)
 
-    # --- lower hemisphere: grid only (f is NOT evaluated here); kept apparent
-    #     to emphasise the inadmissible region ---
-    v_dn = np.linspace(np.pi / 2, np.pi, nv)
-    Xd = np.outer(np.cos(u), np.sin(v_dn))
-    Yd = np.outer(np.sin(u), np.sin(v_dn))
-    Zd = np.outer(np.ones_like(u), np.cos(v_dn))
-    ax.plot_wireframe(Xd, Yd, Zd, color="0.45", linewidth=0.5, alpha=0.6,
-                      rstride=2, cstride=2)
+    draw_grads(near, z=3)                       # near side (over the surface)
 
     # --- equator: solid black boundary of the admissible domain ---
     eu = np.linspace(0, 2 * np.pi, 300)
     ax.plot(np.cos(eu), np.sin(eu), np.zeros_like(eu), "k-", lw=2.2, zorder=4)
 
-    # samples + tangential gradients (thinned; no marker edges, semi-transparent)
-    idx = np.arange(min(n_show, P.shape[0]))
-    ax.scatter(P[idx, 0] * r, P[idx, 1] * r, P[idx, 2] * r, c="k", s=8, alpha=0.4,
-               edgecolors="none", depthshade=False)
-    ax.quiver(P[idx, 0] * r, P[idx, 1] * r , P[idx, 2] * r,
-              Gt[idx, 0], Gt[idx, 1], Gt[idx, 2],
-              length=0.17, color="0.15", linewidth=2, normalize=False, alpha=0.55)
-
-    # geodesics floated above the surface (arc < pi/2 keeps them on the visible cap)
+    # --- geodesics (on top) ---
     t = np.linspace(-arc, arc, 200)
-    AMGc = _geodesic(p0, res.U_active, t) * r
-    IAMGc = _geodesic(p0, res.U_inactive, t) * r
-    EMBc = _geodesic(p0, res.W, t) * r
-    geo(IAMGc, "inactive", 2)
+    geo(_geodesic(p0, res.U_active, t) * r, "active", 5)
+    geo(_geodesic(p0, res.U_inactive, t) * r, "inactive", 7)
     if show_embedding:
-        geo(EMBc, "embedding", 7)
-    geo(AMGc, "active", 1)
+        geo(_geodesic(p0, res.W, t) * r, "embedding", 9)
 
-    # Karcher mean, on top
+    # --- Karcher mean ---
     ax.scatter(*(p0 * r), c="w", s=120, depthshade=False, edgecolor=GEO["mean"],
-               linewidth=2.2, zorder=10)
+               linewidth=2.2, zorder=12)
 
-    # view from the perpendicular bisector of the active/inactive azimuths so
-    # both geodesics read as oblique arcs crossing at p0 (not edge-on); a low
-    # elevation exposes the southern (inadmissible) hemisphere
-    az = np.degrees(np.arctan2(res.U_active[1], res.U_active[0])) + 45
-    ax.view_init(elev=24, azim=az)
-    ax.set_box_aspect((1, 1, 1), zoom=1.45)   # fill the frame
+    ax.view_init(elev=elev, azim=az)
+    ax.set_box_aspect((1, 1, 1), zoom=1.45)
     _hide_3d_panes(ax)
-    ax.set_position([0, 0, 1, 1])              # no surrounding white space
+    ax.set_position([0, 0, 1, 1])
     if path:
         fig.savefig(path, dpi=150); plt.close(fig)
     return fig
@@ -317,15 +356,16 @@ def figure_convergence(func, p0, N_values, nboot=20, path=None):
 
 # --------------------------------------------------------------------------- #
 def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
-    """Ridge recovery as a shadow plot with a shrinking geodesic ball.
+    """Ridge recovery over a shrinking geodesic ball (two panels).
 
-    f is shown against the active geodesic coordinate
-    s1 = <log_{p0}(x), w1>, with the sample scatter drawn in nested shells for
-    decreasing ball radius R (lightening with R; vertical dotted lines mark each
-    ball's extent +/-R).  As R -> 0 the extent contracts and the scatter
-    collapses onto the 1-D active-geodesic sweep -- the visual form of
-    Lemma ridge_recovery.  A genuine 2-D (non-ridge) function retains a vertical
-    spread even at small R."""
+    Left: f against the active geodesic coordinate s1 = <exp^{-1}_{p0}(x), w1>,
+    with the sample scatter in nested shells for decreasing ball radius R
+    (lightening with R; dotted lines mark each ball's extent +/-R).  As R -> 0
+    the extent contracts and the scatter collapses onto the 1-D active-geodesic
+    sweep.  Right: the RMS deviation of the samples from that active-geodesic
+    sweep as a function of R -- the convergence, curvature-limited as R -> 0.
+    A genuine 2-D (non-ridge) function keeps a vertical spread / a nonzero RMS
+    plateau even at small R."""
     p0, E = res.p0, res.E
     u1 = res.U_active
     w1 = E.T @ u1; w1 /= np.linalg.norm(w1)
@@ -337,26 +377,43 @@ def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
     s1 = tnml @ w1                                   # active geodesic coordinate
     fval = func.f(_normal_to_sphere(p0, E, tnml))
 
-    fig, ax = plt.subplots(figsize=(7.6, 4.7))
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.4, 4.7))
+
+    # --- left: shadow over nested shrinking balls ---
     Rs = [0.9, 0.6, 0.3, 0.15]                       # nested, decreasing
     greys = [0.80, 0.58, 0.34, 0.06]                 # light (large R) -> dark (small R)
     ytop = np.nanmax(fval)
     for R, g in zip(Rs, greys):
         m = rr <= R
-        ax.scatter(s1[m], fval[m], s=7, color=str(g), edgecolors="none",
-                   alpha=0.75, zorder=2)
+        axL.scatter(s1[m], fval[m], s=7, color=str(g), edgecolors="none",
+                    alpha=0.75, zorder=2)
         for sgn in (-1, 1):                          # extent of the R-ball in s1
-            ax.axvline(sgn * R, color=str(g), lw=0.9, ls=":", zorder=1)
-        ax.text(R, ytop, fr"$R\!=\!{R:g}$", color="0.25", fontsize=FONT_SIZE - 4,
-                ha="right", va="top", rotation=90)
-
+            axL.axvline(sgn * R, color=str(g), lw=0.9, ls=":", zorder=1)
+        axL.text(R, ytop, fr"$R\!=\!{R:g}$", color="0.25", fontsize=FONT_SIZE - 4,
+                 ha="right", va="top", rotation=90)
     sgrid = np.linspace(-R_max, R_max, 300)
-    fcurve = func.f(_geodesic(p0, u1, sgrid))         # active-geodesic sweep
-    trace2d(ax, sgrid, fcurve, "active", z=6)
+    trace2d(axL, sgrid, func.f(_geodesic(p0, u1, sgrid)), "active", z=6)
+    axL.set_xlabel(r"active geodesic coordinate  $\langle\exp^{-1}_{p_0}(\hat{x}),\,w_1\rangle$")
+    axL.set_ylabel(r"$f\circ\exp_{p_0}$")
+    axL.set_xlim(-1.05 * R_max, 1.05 * R_max)
 
-    ax.set_xlabel(r"active geodesic coordinate  $\langle\log_{p_0}(\hat{x}),\,w_1\rangle$")
-    ax.set_ylabel(r"$f\circ\exp_{p_0}$")
-    ax.set_xlim(-1.05 * R_max, 1.05 * R_max)
+    # --- right: RMS deviation from the active-geodesic sweep vs ball radius ---
+    f_on_curve = func.f(amg.sphere_exp_batch(p0, s1[:, None] * u1[None, :]))
+    dev = fval - f_on_curve
+    Rgrid = np.linspace(0.1, R_max, 16)
+    rms = np.array([np.sqrt(np.mean(dev[rr <= R] ** 2)) if np.any(rr <= R) else np.nan
+                    for R in Rgrid])
+    axR.loglog(Rgrid, np.clip(rms, 1e-16, None), "o-", color="k", lw=2, ms=6, zorder=3)
+    good = np.isfinite(rms) & (rms > 1e-13)
+    if good.sum() >= 2:
+        c = np.polyfit(np.log10(Rgrid[good]), np.log10(rms[good]), 1)
+        axR.loglog(Rgrid, 10 ** c[1] * Rgrid ** c[0], "--", color=GEO["active"], lw=1.5)
+        axR.text(0.05, 0.92, fr"$\propto R^{{{c[0]:.1f}}}$", transform=axR.transAxes,
+                 color=GEO["active"], fontsize=FONT_SIZE - 1, va="top")
+    axR.set_xlabel(r"geodesic-ball radius  $R$")
+    axR.set_ylabel(r"RMS deviation from active geodesic")
+    axR.grid(True, which="both", alpha=0.3)
+
     fig.tight_layout()
     if path:
         fig.savefig(path, dpi=150, bbox_inches="tight"); plt.close(fig)
