@@ -64,9 +64,9 @@ GEO = {
 # sphere, normal-coordinate, and shadow figures.  ***Adjust here to restyle
 # every figure consistently*** (color, dash pattern, width, white-halo width).
 TRACE = {
-    "active":    dict(color=GEO["active"],    ls="-",  lw=3.4, halo=2.6),
-    "inactive":  dict(color=GEO["inactive"],  ls="--", lw=2.8, halo=2.6),
-    "embedding": dict(color=GEO["embedding"], ls=":",  lw=2.6, halo=2.6),
+    "active":    dict(color=GEO["active"],    ls="--",  lw=3, halo=2.25),
+    "inactive":  dict(color=GEO["inactive"],  ls="--", lw=2.5, halo=1.75),
+    "embedding": dict(color=GEO["embedding"], ls=":",  lw=3, halo=2.25),
 }
 
 # The embedding (extrinsic) trace is drawn only when it is meaningfully distinct
@@ -80,9 +80,9 @@ def trace2d(ax, x, y, key, z=6, halo_color="w"):
     """Plot a styled trace (TRACE[key]) with a white halo so it reads over a
     coloured field or a dense scatter.  Used by the 2-D shadow/normal figures."""
     st = TRACE[key]
-    ax.plot(x, y, color=halo_color, lw=st["lw"] + st["halo"], solid_capstyle="round",
-            zorder=z, alpha=0.9)
-    ax.plot(x, y, color=st["color"], ls=st["ls"], lw=st["lw"],
+    ax.plot(x, y, color=halo_color, lw=2.25, solid_capstyle="round",
+            zorder=z, alpha=0)
+    ax.plot(x, y, color=st["color"], ls=st["ls"], lw=2,
             solid_capstyle="round", zorder=z + 1)
 
 
@@ -149,12 +149,12 @@ def _geodesic(p0, direction, t):
 def figure_sphere_3d(func, res, n_show=45, arc=1.25, show_embedding=True, path=None):
     """The function on the sphere with samples, gradients, and geodesics."""
     p0, P, Gt = res.p0, res.P, res.Gt
-    r = 1.04  # float overlays just above the surface
+    r = 1.01  # float overlays just above the surface
 
     def geo(curve, key, z):
         # white halo underneath so the curve reads over the coloured sphere
         st = TRACE[key]
-        ax.plot(*curve.T, "-", color="w", lw=st["lw"] + st["halo"], zorder=z, alpha=0.9)
+        ax.plot(*curve.T, "-", color="w", lw=st["lw"] + st["halo"], zorder=z, alpha=0)
         ax.plot(*curve.T, color=st["color"], ls=st["ls"], lw=st["lw"], zorder=z + 1)
 
     fig = plt.figure(figsize=(6.6, 6.4))
@@ -188,21 +188,21 @@ def figure_sphere_3d(func, res, n_show=45, arc=1.25, show_embedding=True, path=N
 
     # samples + tangential gradients (thinned; no marker edges, semi-transparent)
     idx = np.arange(min(n_show, P.shape[0]))
-    ax.scatter(P[idx, 0], P[idx, 1], P[idx, 2], c="k", s=8, alpha=0.4,
+    ax.scatter(P[idx, 0] * r, P[idx, 1] * r, P[idx, 2] * r, c="k", s=8, alpha=0.4,
                edgecolors="none", depthshade=False)
-    ax.quiver(P[idx, 0], P[idx, 1], P[idx, 2],
+    ax.quiver(P[idx, 0] * r, P[idx, 1] * r , P[idx, 2] * r,
               Gt[idx, 0], Gt[idx, 1], Gt[idx, 2],
-              length=0.17, color="0.15", linewidth=0.5, normalize=False, alpha=0.55)
+              length=0.17, color="0.15", linewidth=2, normalize=False, alpha=0.55)
 
     # geodesics floated above the surface (arc < pi/2 keeps them on the visible cap)
     t = np.linspace(-arc, arc, 200)
     AMGc = _geodesic(p0, res.U_active, t) * r
     IAMGc = _geodesic(p0, res.U_inactive, t) * r
     EMBc = _geodesic(p0, res.W, t) * r
-    geo(IAMGc, "inactive", 5)
+    geo(IAMGc, "inactive", 2)
     if show_embedding:
         geo(EMBc, "embedding", 7)
-    geo(AMGc, "active", 9)
+    geo(AMGc, "active", 1)
 
     # Karcher mean, on top
     ax.scatter(*(p0 * r), c="w", s=120, depthshade=False, edgecolor=GEO["mean"],
@@ -388,6 +388,7 @@ def main():
     tag = func.name
     d_uw = amg.subspace_distance(res.U_active, res.W)
     show_emb = d_uw > EMBED_SHOW_TOL   # hide the coincident embedding trace
+    show_emb = False # TURN THIS OFF
     print(f"d(U1, W)            : {d_uw:.4f}  -> embedding trace "
           f"{'shown' if show_emb else 'hidden (coincident with active)'}")
     figure_normal_coords(func, res, path=os.path.join(FIGDIR, f"01_normal_coords_{tag}.png"))
