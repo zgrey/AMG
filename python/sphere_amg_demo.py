@@ -167,9 +167,10 @@ def _geodesic(p0, direction, t):
     return np.array([amg.sphere_exp(p0, direction, ti) for ti in t])
 
 
-def _hemisphere_grad_grid(func, n=9, rad_max=0.92):
+def _hemisphere_grad_grid(func, n=9, rad_max=0.99):
     """Sparse regular grid of upper-hemisphere points (lifted from the
-    parametrisation disk) and their tangential gradients."""
+    parametrisation disk) and their tangential gradients.  ``rad_max`` near 1
+    fills the domain out to the equator (z = sqrt(1 - rad_max^2))."""
     g = np.linspace(-rad_max, rad_max, n)
     X, Y = np.meshgrid(g, g)
     inside = (X**2 + Y**2) <= rad_max**2
@@ -188,7 +189,7 @@ def _view_direction(elev, azim):
     return np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
 
 
-def figure_sphere_3d(func, res, arc=1.25, n_grid=9, n_sample=12,
+def figure_sphere_3d(func, res, arc=1.25, n_grid=11, n_sample=12,
                      show_embedding=True, seed=0, path=None):
     """The function on the sphere with a sparse grid of tangential gradients
     (near side over the surface, far side occluded by it), the active/inactive/
