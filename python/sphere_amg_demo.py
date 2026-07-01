@@ -35,6 +35,20 @@ import sphere_amg as amg
 
 FIGDIR = os.path.join(os.path.dirname(__file__), "figs")
 
+# --------------------------------------------------------------------------- #
+# Universal font sizing.  ***Bump FONT_SIZE to enlarge the labels, ticks,
+# annotations, and colorbars across every figure at once.***  Tinker freely.
+FONT_SIZE = 15
+plt.rcParams.update({
+    "font.size":        FONT_SIZE,
+    "axes.titlesize":   FONT_SIZE,
+    "axes.labelsize":   FONT_SIZE,
+    "xtick.labelsize":  FONT_SIZE - 1,
+    "ytick.labelsize":  FONT_SIZE - 1,
+    "legend.fontsize":  FONT_SIZE - 1,
+    "figure.titlesize": FONT_SIZE + 1,
+})
+
 
 def get_cmap(name="lapaz"):
     """Resolve a colormap by name: Crameri scientific colour maps (cmcrameri)
@@ -333,8 +347,8 @@ def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
                    alpha=0.75, zorder=2)
         for sgn in (-1, 1):                          # extent of the R-ball in s1
             ax.axvline(sgn * R, color=str(g), lw=0.9, ls=":", zorder=1)
-        ax.text(R, ytop, fr"$R\!=\!{R:g}$", color="0.25", fontsize=7,
-                ha="center", va="bottom")
+        ax.text(R, ytop, fr"$R\!=\!{R:g}$", color="0.25", fontsize=FONT_SIZE - 4,
+                ha="right", va="top", rotation=90)
 
     sgrid = np.linspace(-R_max, R_max, 300)
     fcurve = func.f(_geodesic(p0, u1, sgrid))         # active-geodesic sweep
