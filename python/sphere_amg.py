@@ -216,8 +216,9 @@ class AMGResult:
     U_active: np.ndarray      # intrinsic active direction at p0, (3,)
     U_inactive: np.ndarray    # intrinsic inactive direction at p0, (3,)
     lam: np.ndarray           # intrinsic eigenvalues of G0 (mean-sq dir. deriv.), (2,)
-    W: np.ndarray             # extrinsic (embedding) active direction at p0, (3,)
-    lam_emb: np.ndarray       # extrinsic eigenvalues (C_iota projected to T_{p0}), (2,)
+    W: np.ndarray             # extrinsic (Mukherjee) direction, projected to T_{p0}, (3,)
+    lam_emb: np.ndarray       # ambient eigenvalues of the extrinsic GOP C_iota
+    W_proj_norm: float = 1.0  # survival of the projection of the dominant DR dir. (~0 => conflated)
 
 
 def compute_amg(func: AmbientFunction, p0: np.ndarray, P: np.ndarray) -> AMGResult:
@@ -238,14 +239,21 @@ def compute_amg(func: AmbientFunction, p0: np.ndarray, P: np.ndarray) -> AMGResu
     U_active, U_inactive = U[:, 0], U[:, 1]
     lam = S[:2] ** 2  # eigenvalues of G0 = squared singular values
 
-    # Extrinsic comparison (Thm. normal_eigvals): C_iota projected to T_{p0}.
-    C_iota = (Gt.T @ Gt) / N
-    Cproj = E.T @ C_iota @ E                       # (2, 2)
-    w_val, W2 = np.linalg.eigh(Cproj)
-    order = np.argsort(w_val)[::-1]
-    lam_emb = w_val[order]
-    W = E @ W2[:, order[0]]
-    W /= np.linalg.norm(W)
+    # Extrinsic (Mukherjee) comparison.  C_iota is the ambient p x p gradient
+    # outer product of the *tangential* gradients -- eq. emb_opg, i.e. the
+    # Wu-Mukherjee manifold GOP E[dphi(grad_M f) (x) dphi(grad_M f)].  Its
+    # dominant eigenvector is an *ambient* direction (the DR direction); the
+    # extrinsic estimate at p0 is its projection to the central tangent space
+    # (eigendecompose-then-project).  The projection is the partial isometry of
+    # Thm normal_eigvals: where the DR direction is normal at p0 it collapses.
+    C_iota = (Gt.T @ Gt) / N                        # ambient 3x3 GOP
+    val, vec = np.linalg.eigh(C_iota)
+    order = np.argsort(val)[::-1]
+    lam_emb = val[order]                            # ambient eigenvalues
+    a_hat = vec[:, order[0]]                        # dominant ambient DR direction
+    proj = (np.eye(3) - np.outer(p0, p0)) @ a_hat   # project onto T_{p0}
+    W_proj_norm = float(np.linalg.norm(proj))       # survival (~0 => conflation)
+    W = proj / W_proj_norm if W_proj_norm > 1e-12 else proj
 
     # Orient the active direction for display, then sign-align W to it (order
     # matters: flipping U_active after aligning W would un-align them).
@@ -256,7 +264,7 @@ def compute_amg(func: AmbientFunction, p0: np.ndarray, P: np.ndarray) -> AMGResu
 
     return AMGResult(p0=p0, E=E, P=P, Gt=Gt, Vlog=Vlog,
                      U_active=U_active, U_inactive=U_inactive, lam=lam,
-                     W=W, lam_emb=lam_emb)
+                     W=W, lam_emb=lam_emb, W_proj_norm=W_proj_norm)
 
 
 # --------------------------------------------------------------------------- #

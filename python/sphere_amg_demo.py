@@ -108,13 +108,20 @@ def figure_normal_coords(func, res, R=0.7, ngrid=170, path=None):
     F = func.f(_normal_to_sphere(p0, E, tnml)).reshape(ngrid, ngrid)
     F = np.where(RR <= R, F, np.nan)                 # restrict to the geodesic ball
 
-    # projected tangential gradient on a coarse grid inside the ball
+    # gradient field on a coarse grid inside the ball.  For consistency with the
+    # AMG construction the arrows are the *parallel transport to p0* of the
+    # tangential gradient at each p=exp_{p0}(Et) (the G0 integrand), expressed in
+    # the normal-coordinate (E) frame -- not the local gradient dropped in by
+    # projection.  Transport over the sphere; at p0 normal coordinates are
+    # Euclidean, so the in-plane transport is the identity.
     gc = np.linspace(-R, R, 17)
     Q1, Q2 = np.meshgrid(gc, gc)
     tq = np.column_stack([Q1.ravel(), Q2.ravel()])
     tq = tq[np.hypot(tq[:, 0], tq[:, 1]) <= 0.97 * R]
     xq = _normal_to_sphere(p0, E, tq)
-    pg = amg.project_tangent(func.grad(xq), xq) @ E
+    Gt_q = amg.project_tangent(func.grad(xq), xq)
+    pg = np.array([amg.parallel_transport(xq[i], p0, Gt_q[i])
+                   for i in range(len(xq))]) @ E
 
     fig, ax = plt.subplots(figsize=(5.7, 5.1))
     cs = ax.contourf(T1, T2, F, 60, cmap=CMAP)
@@ -295,63 +302,51 @@ def figure_convergence(func, p0, N_values, nboot=20, path=None):
 
 
 # --------------------------------------------------------------------------- #
-def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, deg=6, seed=1, path=None):
-    """Demonstrate that an ambient ridge is recovered as a ridge *in normal
-    coordinates* over geodesic balls.
+def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
+    """Ridge recovery as a shadow plot with a shrinking geodesic ball.
 
-    Left:  f collapses onto the single active normal coordinate
-           s1 = <t, w1> -- points at the same s1 but different inactive
-           coordinate s2 share the same value (a curve, not a cloud) for a
-           ridge; a genuine 2-D function spreads into a band.
-    Right: the unexplained variance  1 - R^2_ridge  (fraction of f-variance a
-           1-D fit in s1 misses) as a function of the geodesic-ball radius R.
-           For a ridge this vanishes as R -> 0 (curvature-limited, ~R^2);
-           for a non-ridge it plateaus at O(1)."""
+    f is shown against the active geodesic coordinate
+    s1 = <log_{p0}(x), w1>, with the sample scatter drawn in nested shells for
+    decreasing ball radius R (lightening with R; vertical dotted lines mark each
+    ball's extent +/-R).  As R -> 0 the extent contracts and the scatter
+    collapses onto the 1-D active-geodesic sweep -- the visual form of
+    Lemma ridge_recovery.  A genuine 2-D (non-ridge) function retains a vertical
+    spread even at small R."""
     p0, E = res.p0, res.E
-    w1 = E.T @ res.U_active; w1 /= np.linalg.norm(w1)
-    w2 = E.T @ res.U_inactive; w2 /= np.linalg.norm(w2)
+    u1 = res.U_active
+    w1 = E.T @ u1; w1 /= np.linalg.norm(w1)
 
     rng = np.random.default_rng(seed)
-    rr = R_max * np.sqrt(rng.random(npts))          # uniform over the disk
+    rr = R_max * np.sqrt(rng.random(npts))           # geodesic ball radius |log_{p0}|
     th = 2 * np.pi * rng.random(npts)
     tnml = np.column_stack([rr * np.cos(th), rr * np.sin(th)])
-    s1, s2 = tnml @ w1, tnml @ w2
+    s1 = tnml @ w1                                   # active geodesic coordinate
     fval = func.f(_normal_to_sphere(p0, E, tnml))
 
-    def residual_fraction(mask):
-        x, y = s1[mask], fval[mask]
-        if y.size < deg + 2 or np.var(y) < 1e-30:
-            return np.nan
-        c = np.polyfit(x, y, deg)
-        return np.var(y - np.polyval(c, x)) / np.var(y)
+    fig, ax = plt.subplots(figsize=(7.6, 4.7))
+    Rs = [0.9, 0.6, 0.3, 0.15]                       # nested, decreasing
+    greys = [0.80, 0.58, 0.34, 0.06]                 # light (large R) -> dark (small R)
+    ytop = np.nanmax(fval)
+    for R, g in zip(Rs, greys):
+        m = rr <= R
+        ax.scatter(s1[m], fval[m], s=7, color=str(g), edgecolors="none",
+                   alpha=0.75, zorder=2)
+        for sgn in (-1, 1):                          # extent of the R-ball in s1
+            ax.axvline(sgn * R, color=str(g), lw=0.9, ls=":", zorder=1)
+        ax.text(R, ytop, fr"$R\!=\!{R:g}$", color="0.25", fontsize=7,
+                ha="center", va="bottom")
 
-    Rs = np.linspace(0.12, R_max, 16)
-    resid = np.array([residual_fraction(rr <= R) for R in Rs])
+    sgrid = np.linspace(-R_max, R_max, 300)
+    fcurve = func.f(_geodesic(p0, u1, sgrid))         # active-geodesic sweep
+    trace2d(ax, sgrid, fcurve, "active", z=6)
 
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(10.4, 4.5))
-
-    order = np.argsort(np.abs(s2))[::-1]            # large |s2| behind
-    sc = axL.scatter(s1[order], fval[order], c=s2[order], cmap=CMAP, s=10,
-                     edgecolors="none", alpha=0.55)
-    axL.set_xlabel(r"active coordinate  $s_1=\langle t,\,w_1\rangle$")
-    axL.set_ylabel(r"$f\circ\exp_{p_0}$")
-    fig.colorbar(sc, ax=axL, shrink=0.85, label=r"inactive  $s_2=\langle t,\,w_2\rangle$")
-
-    resid_plot = np.clip(resid, 1e-16, None)
-    axR.loglog(Rs, resid_plot, "o-", color=GEO["active"], lw=2, ms=6)
-    axR.set_xlabel(r"geodesic-ball radius  $R$")
-    axR.set_ylabel(r"unexplained variance  $1-R^2_{\mathrm{ridge}}$")
-    axR.grid(True, which="both", alpha=0.3)
-    good = np.isfinite(resid) & (resid > 1e-13)
-    slope = None
-    if good.sum() >= 2:
-        c = np.polyfit(np.log10(Rs[good]), np.log10(resid[good]), 1)
-        axR.plot(Rs, 10 ** c[1] * Rs ** c[0], "k--", lw=1)   # power-law guide
-        slope = c[0]
+    ax.set_xlabel(r"active geodesic coordinate  $\langle\log_{p_0}(\hat{x}),\,w_1\rangle$")
+    ax.set_ylabel(r"$f\circ\exp_{p_0}$")
+    ax.set_xlim(-1.05 * R_max, 1.05 * R_max)
     fig.tight_layout()
     if path:
         fig.savefig(path, dpi=150, bbox_inches="tight"); plt.close(fig)
-    return fig, resid, slope
+    return fig
 
 
 # --------------------------------------------------------------------------- #
@@ -388,7 +383,6 @@ def main():
     tag = func.name
     d_uw = amg.subspace_distance(res.U_active, res.W)
     show_emb = d_uw > EMBED_SHOW_TOL   # hide the coincident embedding trace
-    show_emb = False # TURN THIS OFF
     print(f"d(U1, W)            : {d_uw:.4f}  -> embedding trace "
           f"{'shown' if show_emb else 'hidden (coincident with active)'}")
     figure_normal_coords(func, res, path=os.path.join(FIGDIR, f"01_normal_coords_{tag}.png"))
@@ -396,10 +390,8 @@ def main():
                      path=os.path.join(FIGDIR, f"02_sphere3d_{tag}.png"))
     figure_shadow(func, res, show_embedding=show_emb,
                   path=os.path.join(FIGDIR, f"03_shadow_{tag}.png"))
-    _, _, rr_slope = figure_ridge_recovery(
+    figure_ridge_recovery(
         func, res, path=os.path.join(FIGDIR, f"05_ridge_recovery_{tag}.png"))
-    if rr_slope is not None:
-        print(f"ridge-recovery slope: R^{rr_slope:.2f}")
     # Convergence needs a non-degenerate reference: the ridge direction must
     # have a non-vanishing tangential component at p0 (the aligned case is
     # normal at the pole -> skip it, and say so).
