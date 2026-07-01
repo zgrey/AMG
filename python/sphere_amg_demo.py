@@ -81,6 +81,9 @@ TRACE = {
     "active":    dict(color=GEO["active"],    ls="--",  lw=3, halo=2.25),
     "inactive":  dict(color=GEO["inactive"],  ls="--", lw=2.5, halo=1.75),
     "embedding": dict(color=GEO["embedding"], ls=":",  lw=3, halo=2.25),
+    "black": dict(color='k', ls=":", lw = 1),
+    "inactive_dots": dict(color=GEO["inactive"],  ls=":", lw=2),
+    "active_dots": dict(color=GEO["active"],    ls=":",  lw=2),
 }
 
 # The embedding (extrinsic) trace is drawn only when it is meaningfully distinct
@@ -166,21 +169,35 @@ def _geodesic(p0, direction, t):
     """Points along the geodesic Exp_{p0}(t * direction) for an array t."""
     return np.array([amg.sphere_exp(p0, direction, ti) for ti in t])
 
+def _sphere_grad_grid(func, n=8, rad_max=1.0):
+    """Sparse regular (theta, phi) grid of upper-hemisphere points and their
+    tangential gradients.  The sampled domain is the spherical cap
+    0 <= theta <= arcsin(rad_max); its outer ring sits at
+    z = cos(arcsin(rad_max)) = sqrt(1 - rad_max^2), so ``rad_max`` near 1
+    fills the cap out to the equator (z -> 0)."""
+    if not 0.0 < rad_max <= 1.0:
+        raise ValueError("rad_max must lie in (0, 1]; theta = arcsin(rad_max) "
+                         "is undefined otherwise.")
 
-def _hemisphere_grad_grid(func, n=9, rad_max=0.99):
-    """Sparse regular grid of upper-hemisphere points (lifted from the
-    parametrisation disk) and their tangential gradients.  ``rad_max`` near 1
-    fills the domain out to the equator (z = sqrt(1 - rad_max^2))."""
-    g = np.linspace(-rad_max, rad_max, n)
-    X, Y = np.meshgrid(g, g)
-    inside = (X**2 + Y**2) <= rad_max**2
-    x, y = X[inside], Y[inside]
-    z = np.sqrt(np.clip(1 - x**2 - y**2, 0.0, 1.0))
-    Pg = np.column_stack([x, y, z])
-    Pg /= np.linalg.norm(Pg, axis=1, keepdims=True)
+    theta_max = np.arcsin(rad_max)
+    theta = np.linspace(0.0, theta_max, n)                   # rings: pole -> boundary
+    phi = np.linspace(0.0, 2.0 * np.pi, 2*n, endpoint=False)   # azimuths
+
+    # theta[0] == 0 is the north pole: a single point for every phi.  Emit it
+    # once, then take the full (theta > 0) x phi product for the rings so the
+    # output carries no duplicate rows (mirrors the disk grid's uniqueness).
+    pole = np.array([[0.0, 0.0, 1.0]])
+    T, Ph = np.meshgrid(theta[1:], phi, indexing="ij")
+    rings = np.column_stack([
+        (np.sin(T) * np.cos(Ph)).ravel(),
+        (np.sin(T) * np.sin(Ph)).ravel(),
+        np.cos(T).ravel(),
+    ])
+    Pg = np.vstack([pole, rings])
+
+    Pg /= np.linalg.norm(Pg, axis=1, keepdims=True)  # unit by construction; guards fp error
     Gg = amg.project_tangent(func.grad(Pg), Pg)
     return Pg, Gg
-
 
 def _view_direction(elev, azim):
     """Unit vector from the origin toward the camera for a matplotlib 3-D view
@@ -189,7 +206,7 @@ def _view_direction(elev, azim):
     return np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
 
 
-def figure_sphere_3d(func, res, arc=1.25, n_grid=11, n_sample=12,
+def figure_sphere_3d(func, res, arc=1.25, n_grid=7, n_sample=12,
                      show_embedding=True, seed=0, path=None):
     """The function on the sphere with a sparse grid of tangential gradients
     (near side over the surface, far side occluded by it), the active/inactive/
@@ -225,7 +242,7 @@ def figure_sphere_3d(func, res, arc=1.25, n_grid=11, n_sample=12,
                       zorder=0)
 
     # --- sparse gradient grid, split near / far for occlusion ---
-    Pg, Gg = _hemisphere_grad_grid(func, n=n_grid)
+    Pg, Gg = _sphere_grad_grid(func, n=n_grid)
     near = (Pg @ view) > 0
     rng = np.random.default_rng(seed)
     sub = np.zeros(len(Pg), bool)
@@ -244,8 +261,6 @@ def figure_sphere_3d(func, res, arc=1.25, n_grid=11, n_sample=12,
                        facecolors="none", edgecolors="k", linewidths=2.0,
                        depthshade=False, zorder=z + 0.5)
 
-    draw_grads(~near, z=1)                      # far side (will be occluded)
-
     # --- upper hemisphere surface (occludes the far-side gradients) ---
     v_up = np.linspace(0, np.pi / 2, nv)
     Xu = np.outer(np.cos(u), np.sin(v_up))
@@ -254,20 +269,20 @@ def figure_sphere_3d(func, res, arc=1.25, n_grid=11, n_sample=12,
     Fs = func.f(np.column_stack([Xu.ravel(), Yu.ravel(), Zu.ravel()])).reshape(nu, nv)
     facec = CMAP((Fs - Fs.min()) / (np.ptp(Fs) + 1e-30))
     ax.plot_surface(Xu, Yu, Zu, facecolors=facec, rstride=1, cstride=1,
-                    linewidth=0, antialiased=True, alpha=0.9, shade=False, zorder=2)
+                    linewidth=0, antialiased=True, alpha=1.0, shade=False, zorder=2)
 
-    draw_grads(near, z=3)                       # near side (over the surface)
+    draw_grads(near, z=7)                       # near side (over the surface)
 
     # --- equator: solid black boundary of the admissible domain ---
     eu = np.linspace(0, 2 * np.pi, 300)
-    ax.plot(np.cos(eu), np.sin(eu), np.zeros_like(eu), "k-", lw=2.2, zorder=4)
+    ax.plot(np.cos(eu), np.sin(eu), np.zeros_like(eu), "k-", lw=3, zorder=1)
 
     # --- geodesics (on top) ---
-    t = np.linspace(-arc, arc, 200)
-    geo(_geodesic(p0, res.U_active, t) * r, "active", 5)
-    geo(_geodesic(p0, res.U_inactive, t) * r, "inactive", 7)
-    if show_embedding:
-        geo(_geodesic(p0, res.W, t) * r, "embedding", 9)
+    t = np.linspace(-arc*0.20, arc, 200)
+    geo(_geodesic(p0, res.U_active, t) * r, "active", 3)
+    geo(_geodesic(p0, res.U_inactive, -t) * r, "inactive", 3)
+    #if show_embedding:
+    #    geo(_geodesic(p0, res.W, t) * r, "embedding", 3)
 
     # --- Karcher mean ---
     ax.scatter(*(p0 * r), c="w", s=120, depthshade=False, edgecolor=GEO["mean"],
@@ -356,7 +371,7 @@ def figure_convergence(func, p0, N_values, nboot=20, path=None):
 
 
 # --------------------------------------------------------------------------- #
-def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
+def figure_ridge_recovery(func, res, R_max=1.0, npts=9000, seed=1, path=None):
     """Ridge recovery over a shrinking geodesic ball (two panels).
 
     Left: f against the active geodesic coordinate s1 = <exp^{-1}_{p0}(x), w1>,
@@ -369,6 +384,7 @@ def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
     plateau even at small R."""
     p0, E = res.p0, res.E
     u1 = res.U_active
+    u2 = res.U_inactive
     w1 = E.T @ u1; w1 /= np.linalg.norm(w1)
 
     rng = np.random.default_rng(seed)
@@ -381,22 +397,26 @@ def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.4, 4.7))
 
     # --- left: shadow over nested shrinking balls ---
-    Rs = [0.9, 0.6, 0.3, 0.15]                       # nested, decreasing
-    greys = [0.80, 0.58, 0.34, 0.06]                 # light (large R) -> dark (small R)
-    ytop = np.nanmax(fval)
+    Rs = [1.0, 0.6, 0.3, 0.15]                       # nested, decreasing
+    greys = [0.80, 0.55, 0.35, 0.0]                 # light (large R) -> dark (small R)
+    ytop = np.nanmin(fval)+0.75
     for R, g in zip(Rs, greys):
         m = rr <= R
         axL.scatter(s1[m], fval[m], s=7, color=str(g), edgecolors="none",
                     alpha=0.75, zorder=2)
+        slocal = np.linspace(-R, R, 2)
+        axL.scatter(slocal, func.f(_geodesic(p0, u2, slocal)), marker="o", color=str(g), alpha = 0.75, s=20)
+        axL.scatter(slocal, func.f(_geodesic(p0, u1, slocal)), marker="o", color=str(g), alpha = 0.75, s=20)
         for sgn in (-1, 1):                          # extent of the R-ball in s1
-            axL.axvline(sgn * R, color=str(g), lw=0.9, ls=":", zorder=1)
+            axL.axvline(sgn * R, color=str(g), lw=0.9, ls=":", zorder=2)
         axL.text(R, ytop, fr"$R\!=\!{R:g}$", color="0.25", fontsize=FONT_SIZE - 4,
                  ha="right", va="top", rotation=90)
     sgrid = np.linspace(-R_max, R_max, 300)
-    trace2d(axL, sgrid, func.f(_geodesic(p0, u1, sgrid)), "active", z=6)
+    trace2d(axL, sgrid, func.f(_geodesic(p0, u2, sgrid)), "inactive", z=0)
+    trace2d(axL, sgrid, func.f(_geodesic(p0, u1, sgrid)), "active", z=1)
     axL.set_xlabel(r"active geodesic coordinate  $\langle\exp^{-1}_{p_0}(\hat{x}),\,w_1\rangle$")
     axL.set_ylabel(r"$f\circ\exp_{p_0}$")
-    axL.set_xlim(-1.05 * R_max, 1.05 * R_max)
+    axL.set_xlim(-1.15 * R_max, 1.15 * R_max)
 
     # --- right: RMS deviation from the active-geodesic sweep vs ball radius ---
     f_on_curve = func.f(amg.sphere_exp_batch(p0, s1[:, None] * u1[None, :]))
@@ -404,11 +424,11 @@ def figure_ridge_recovery(func, res, R_max=0.9, npts=9000, seed=1, path=None):
     Rgrid = np.linspace(0.1, R_max, 16)
     rms = np.array([np.sqrt(np.mean(dev[rr <= R] ** 2)) if np.any(rr <= R) else np.nan
                     for R in Rgrid])
-    axR.loglog(Rgrid, np.clip(rms, 1e-16, None), "o-", color="k", lw=2, ms=6, zorder=3)
+    axR.loglog(Rgrid, np.clip(rms, 1e-16, None), "o-", color="k", lw=2, ms=6, zorder=1)
     good = np.isfinite(rms) & (rms > 1e-13)
     if good.sum() >= 2:
         c = np.polyfit(np.log10(Rgrid[good]), np.log10(rms[good]), 1)
-        axR.loglog(Rgrid, 10 ** c[1] * Rgrid ** c[0], "--", color=GEO["active"], lw=1.5)
+        axR.loglog(Rgrid, 10 ** c[1] * Rgrid ** c[0], "--", color=GEO["active"], lw=3)
         axR.text(0.05, 0.92, fr"$\propto R^{{{c[0]:.1f}}}$", transform=axR.transAxes,
                  color=GEO["active"], fontsize=FONT_SIZE - 1, va="top")
     axR.set_xlabel(r"geodesic-ball radius  $R$")
