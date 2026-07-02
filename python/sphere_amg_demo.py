@@ -200,7 +200,7 @@ def _view_direction(elev, azim):
 
 
 def _draw_sphere_3d(ax, func, res, arc=1.25, n_grid=7, n_sample=12,
-                    show_embedding=True, seed=0, zoom=1.45):
+                    show_embedding=True, seed=0, zoom=1.45, grad_len=0.28):
     """Draw the sphere, sparse gradient grid, ringed Monte-Carlo subset, and
     geodesics into a 3-D ``ax`` (behaviour matches the standalone figure)."""
     p0 = res.p0
@@ -227,6 +227,10 @@ def _draw_sphere_3d(ax, func, res, arc=1.25, n_grid=7, n_sample=12,
                       zorder=0)
 
     Pg, Gg = _sphere_grad_grid(func, n=n_grid)
+    # scale the arrows so the largest reaches ``grad_len`` while keeping their
+    # relative magnitudes honest -- avoids overflow for large-gradient functions
+    gmax = np.linalg.norm(Gg, axis=1).max()
+    glen = grad_len / gmax if gmax > 1e-12 else grad_len
     near = (Pg @ view) > 0
     rng = np.random.default_rng(seed)
     sub = np.zeros(len(Pg), bool)
@@ -237,7 +241,7 @@ def _draw_sphere_3d(ax, func, res, arc=1.25, n_grid=7, n_sample=12,
             return
         ax.quiver(Pg[mask, 0], Pg[mask, 1], Pg[mask, 2],
                   Gg[mask, 0], Gg[mask, 1], Gg[mask, 2],
-                  length=0.20, color="0.12", linewidth=1.4, normalize=False,
+                  length=glen, color="0.12", linewidth=1.4, normalize=False,
                   alpha=0.9, zorder=z)
         ring = mask & sub                      # Monte Carlo sample: ring the feet
         if np.any(ring):
