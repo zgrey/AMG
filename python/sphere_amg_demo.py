@@ -110,53 +110,46 @@ def _normal_to_sphere(p0, E, tnml):
     return amg.sphere_exp_batch(p0, tnml @ E.T)
 
 
-def figure_normal_coords(func, res, R=0.7, ngrid=170, path=None):
-    """Contour of the function in normal coordinates over a *geodesic ball* of
-    radius R at p0, with the projected Riemannian-gradient quiver and the
-    intrinsic active/inactive axes.  Uses the true normal-coordinate map
-    Exp_{p0}(t) (not the MATLAB's Exp(1, .)), so the neighbourhood is a
-    faithful geodesic ball -- the key picture for interpreting the metric."""
+def _draw_normal_coords(ax, func, res, R=0.7, ngrid=170, quiver=True):
+    """Draw the normal-coordinate contour, gradient quiver (tangential gradient
+    parallel-transported to p0 -- the G0 integrand), and active/inactive axes
+    into ``ax``.  Returns the contourf handle (for an optional colorbar)."""
     p0, E = res.p0, res.E
-
     g = np.linspace(-R, R, ngrid)
     T1, T2 = np.meshgrid(g, g)
     RR = np.hypot(T1, T2)
     tnml = np.column_stack([T1.ravel(), T2.ravel()])
     F = func.f(_normal_to_sphere(p0, E, tnml)).reshape(ngrid, ngrid)
     F = np.where(RR <= R, F, np.nan)                 # restrict to the geodesic ball
-
-    # gradient field on a coarse grid inside the ball.  For consistency with the
-    # AMG construction the arrows are the *parallel transport to p0* of the
-    # tangential gradient at each p=exp_{p0}(Et) (the G0 integrand), expressed in
-    # the normal-coordinate (E) frame -- not the local gradient dropped in by
-    # projection.  Transport over the sphere; at p0 normal coordinates are
-    # Euclidean, so the in-plane transport is the identity.
-    gc = np.linspace(-R, R, 17)
-    Q1, Q2 = np.meshgrid(gc, gc)
-    tq = np.column_stack([Q1.ravel(), Q2.ravel()])
-    tq = tq[np.hypot(tq[:, 0], tq[:, 1]) <= 0.97 * R]
-    xq = _normal_to_sphere(p0, E, tq)
-    Gt_q = amg.project_tangent(func.grad(xq), xq)
-    pg = np.array([amg.parallel_transport(xq[i], p0, Gt_q[i])
-                   for i in range(len(xq))]) @ E
-
-    fig, ax = plt.subplots(figsize=(5.7, 5.1))
     cs = ax.contourf(T1, T2, F, 60, cmap=CMAP)
     ax.contour(T1, T2, F, 14, colors="k", linewidths=0.35, alpha=0.4)
-    ax.quiver(tq[:, 0], tq[:, 1], pg[:, 0], pg[:, 1], color="k",
-              width=0.004, alpha=0.85)
-
+    if quiver:
+        gc = np.linspace(-R, R, 17)
+        Q1, Q2 = np.meshgrid(gc, gc)
+        tq = np.column_stack([Q1.ravel(), Q2.ravel()])
+        tq = tq[np.hypot(tq[:, 0], tq[:, 1]) <= 0.97 * R]
+        xq = _normal_to_sphere(p0, E, tq)
+        Gt_q = amg.project_tangent(func.grad(xq), xq)
+        pg = np.array([amg.parallel_transport(xq[i], p0, Gt_q[i])
+                       for i in range(len(xq))]) @ E
+        ax.quiver(tq[:, 0], tq[:, 1], pg[:, 0], pg[:, 1], color="k",
+                  width=0.004, alpha=0.85)
     th = np.linspace(0, 2 * np.pi, 240)
     ax.plot(R * np.cos(th), R * np.sin(th), "k-", lw=1.4)  # geodesic-ball boundary
-
     u1 = E.T @ res.U_active; u1 = u1 / np.linalg.norm(u1) * R
     u2 = E.T @ res.U_inactive; u2 = u2 / np.linalg.norm(u2) * R
     trace2d(ax, [-u1[0], u1[0]], [-u1[1], u1[1]], "active", z=6)
     trace2d(ax, [-u2[0], u2[0]], [-u2[1], u2[1]], "inactive", z=6)
-
-    ax.set_xlabel(r"$t_1$"); ax.set_ylabel(r"$t_2$")
     ax.set_aspect("equal")
     ax.set_xlim(-1.05 * R, 1.05 * R); ax.set_ylim(-1.05 * R, 1.05 * R)
+    return cs
+
+
+def figure_normal_coords(func, res, R=0.7, ngrid=170, path=None):
+    """Standalone normal-coordinate figure (axis labels + colorbar)."""
+    fig, ax = plt.subplots(figsize=(5.7, 5.1))
+    cs = _draw_normal_coords(ax, func, res, R=R, ngrid=ngrid)
+    ax.set_xlabel(r"$t_1$"); ax.set_ylabel(r"$t_2$")
     fig.colorbar(cs, ax=ax, shrink=0.85, label=r"$f\circ\exp_{p_0}$")
     fig.tight_layout()
     if path:
@@ -206,34 +199,26 @@ def _view_direction(elev, azim):
     return np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
 
 
-def figure_sphere_3d(func, res, arc=1.25, n_grid=7, n_sample=12,
-                     show_embedding=True, seed=0, path=None):
-    """The function on the sphere with a sparse grid of tangential gradients
-    (near side over the surface, far side occluded by it), the active/inactive/
-    embedding geodesics, and a ringed random subset marking the Monte Carlo
-    sample used for the approximation."""
+def _draw_sphere_3d(ax, func, res, arc=1.25, n_grid=7, n_sample=12,
+                    show_embedding=True, seed=0, zoom=1.45):
+    """Draw the sphere, sparse gradient grid, ringed Monte-Carlo subset, and
+    geodesics into a 3-D ``ax`` (behaviour matches the standalone figure)."""
     p0 = res.p0
     r = 1.01  # float the curves/markers just above the surface
-
-    # camera direction, to split the gradient grid into near (drawn over the
-    # surface) and far (drawn under it, so the surface occludes it)
     elev = 24
     az = np.degrees(np.arctan2(res.U_active[1], res.U_active[0])) + 45
     view = _view_direction(elev, az)
+    ax.computed_zorder = False  # respect explicit zorder (hand-managed occlusion)
 
     def geo(curve, key, z):
         st = TRACE[key]
         ax.plot(*curve.T, "-", color="w", lw=st["lw"] + st["halo"], zorder=z, alpha=0)
         ax.plot(*curve.T, color=st["color"], ls=st["ls"], lw=st["lw"], zorder=z + 1)
 
-    fig = plt.figure(figsize=(6.6, 6.4))
-    ax = fig.add_subplot(111, projection="3d")
-    ax.computed_zorder = False  # respect explicit zorder (hand-managed occlusion)
-
     nu, nv = 72, 34
     u = np.linspace(0, 2 * np.pi, nu)
 
-    # --- lower hemisphere: grid only (inadmissible region), behind everything ---
+    # lower hemisphere: grid only (inadmissible region), behind everything
     v_dn = np.linspace(np.pi / 2, np.pi, nv)
     ax.plot_wireframe(np.outer(np.cos(u), np.sin(v_dn)),
                       np.outer(np.sin(u), np.sin(v_dn)),
@@ -241,7 +226,6 @@ def figure_sphere_3d(func, res, arc=1.25, n_grid=7, n_sample=12,
                       color="0.45", linewidth=0.5, alpha=0.6, rstride=2, cstride=2,
                       zorder=0)
 
-    # --- sparse gradient grid, split near / far for occlusion ---
     Pg, Gg = _sphere_grad_grid(func, n=n_grid)
     near = (Pg @ view) > 0
     rng = np.random.default_rng(seed)
@@ -261,7 +245,6 @@ def figure_sphere_3d(func, res, arc=1.25, n_grid=7, n_sample=12,
                        facecolors="none", edgecolors="k", linewidths=2.0,
                        depthshade=False, zorder=z + 0.5)
 
-    # --- upper hemisphere surface (occludes the far-side gradients) ---
     v_up = np.linspace(0, np.pi / 2, nv)
     Xu = np.outer(np.cos(u), np.sin(v_up))
     Yu = np.outer(np.sin(u), np.sin(v_up))
@@ -273,24 +256,30 @@ def figure_sphere_3d(func, res, arc=1.25, n_grid=7, n_sample=12,
 
     draw_grads(near, z=7)                       # near side (over the surface)
 
-    # --- equator: solid black boundary of the admissible domain ---
     eu = np.linspace(0, 2 * np.pi, 300)
     ax.plot(np.cos(eu), np.sin(eu), np.zeros_like(eu), "k-", lw=3, zorder=1)
 
-    # --- geodesics (on top) ---
-    t = np.linspace(-arc*0.20, arc, 200)
+    t = np.linspace(-arc * 0.20, arc, 200)
     geo(_geodesic(p0, res.U_active, t) * r, "active", 3)
     geo(_geodesic(p0, res.U_inactive, -t) * r, "inactive", 3)
     #if show_embedding:
     #    geo(_geodesic(p0, res.W, t) * r, "embedding", 3)
 
-    # --- Karcher mean ---
     ax.scatter(*(p0 * r), c="w", s=120, depthshade=False, edgecolor=GEO["mean"],
                linewidth=2.2, zorder=12)
 
     ax.view_init(elev=elev, azim=az)
-    ax.set_box_aspect((1, 1, 1), zoom=1.45)
+    ax.set_box_aspect((1, 1, 1), zoom=zoom)
     _hide_3d_panes(ax)
+
+
+def figure_sphere_3d(func, res, arc=1.25, n_grid=7, n_sample=12,
+                     show_embedding=True, seed=0, path=None):
+    """Standalone 3-D sphere figure (fills the frame)."""
+    fig = plt.figure(figsize=(6.6, 6.4))
+    ax = fig.add_subplot(111, projection="3d")
+    _draw_sphere_3d(ax, func, res, arc=arc, n_grid=n_grid, n_sample=n_sample,
+                    show_embedding=show_embedding, seed=seed)
     ax.set_position([0, 0, 1, 1])
     if path:
         fig.savefig(path, dpi=150); plt.close(fig)
@@ -305,42 +294,90 @@ def _hide_3d_panes(ax):
 
 
 # --------------------------------------------------------------------------- #
-def figure_shadow(func, res, nsweep=40, ngeo=200, show_embedding=True, path=None):
-    """Shadow plot: f along a sweep of geodesics from active to inactive,
-    with the active/inactive/embedding sweeps highlighted and the sample
-    scatter over the active coordinate."""
+def _draw_shadow(ax, func, res, nsweep=40, ngeo=200, show_embedding=True):
+    """Draw the shadow sweeps, sample scatter, and haloed intrinsic traces into
+    ``ax``.  Returns the scatter handle (for an optional colorbar)."""
     p0, P = res.p0, res.P
     u1, u2, w = res.U_active, res.U_inactive, res.W
-
-    # active-coordinate of each sample: <Log_{p0}(P), u1>
-    Gy = np.array([amg.sphere_log(p0, q) @ u1 for q in P])
+    Gy = np.array([amg.sphere_log(p0, q) @ u1 for q in P])   # <Log_{p0}(P), u1>
     Fp = func.f(P)
     Tr = 1.2 * np.max(np.abs(Gy)) if Gy.size else 1.5
     tg = np.linspace(-Tr, Tr, ngeo)
-
-    fig, ax = plt.subplots(figsize=(6.2, 4.6))
-
-    # sweep directions rotating u1 -> u2 (normalised)
-    for s in np.linspace(0, 1, nsweep):
+    for s in np.linspace(0, 1, nsweep):                      # sweep u1 -> u2
         d = (1 - s) * u1 + s * u2
         d /= np.linalg.norm(d)
-        shade = abs(d @ u1)               # 1 at active, ~0 at inactive
-        col = str(float(np.clip(0.85 * (1 - shade), 0.0, 1.0)))  # grey; clamp fp noise
-        vals = func.f(_geodesic(p0, d, tg))
-        ax.plot(tg, vals, "-", color=col, lw=0.6, zorder=1)
-
-    # scatter underneath, then the intrinsic traces on top (haloed) so they are
-    # not obscured; embedding only when it differs from the active trace
+        shade = abs(d @ u1)
+        col = str(float(np.clip(0.85 * (1 - shade), 0.0, 1.0)))
+        ax.plot(tg, func.f(_geodesic(p0, d, tg)), "-", color=col, lw=0.6, zorder=1)
     sc = ax.scatter(Gy, Fp, c=Fp, cmap=CMAP, s=26, edgecolors="none",
                     alpha=0.5, zorder=2)
     if show_embedding:
         trace2d(ax, tg, func.f(_geodesic(p0, w, tg)), "embedding", z=6)
     trace2d(ax, tg, func.f(_geodesic(p0, u2, tg)), "inactive", z=8)
     trace2d(ax, tg, func.f(_geodesic(p0, u1, tg)), "active", z=10)
+    return sc
 
+
+def figure_shadow(func, res, nsweep=40, ngeo=200, show_embedding=True, path=None):
+    """Standalone shadow figure (axis labels + colorbar)."""
+    fig, ax = plt.subplots(figsize=(6.2, 4.6))
+    sc = _draw_shadow(ax, func, res, nsweep=nsweep, ngeo=ngeo,
+                      show_embedding=show_embedding)
     ax.set_xlabel(r"$t$"); ax.set_ylabel(r"$(f\circ\exp_{p_0})(t\,w)$")
     fig.colorbar(sc, ax=ax, shrink=0.85, label=r"$f$")
     fig.tight_layout()
+    if path:
+        fig.savefig(path, dpi=150, bbox_inches="tight"); plt.close(fig)
+    return fig
+
+
+# --------------------------------------------------------------------------- #
+PANEL_FUNCS = ["linear_random", "linear_aligned", "quadratic_ridge",
+               "quadratic_pref", "nonlinear_ridge", "nonlinear_nonridge"]
+PANEL_LABELS = {"linear_random": "linear ridge", "linear_aligned": "linear (aligned)",
+                "quadratic_ridge": "quadratic ridge", "quadratic_pref": "quadratic",
+                "nonlinear_ridge": "nonlinear ridge",
+                "nonlinear_nonridge": "nonlinear non-ridge"}
+
+
+def figure_panel(funcs=None, N=2000, seed=47, R=0.7, path=None):
+    """Gallery of the toy examples: rows = functions, columns = normal
+    coordinates / on the sphere / shadow plot.  Shared/minimal annotations
+    (column headers + row labels only), no colorbars, tight layout."""
+    funcs = PANEL_FUNCS if funcs is None else funcs
+    heads = ["normal coordinates", "on the sphere", "shadow plot"]
+    nrow = len(funcs)
+    fig = plt.figure(figsize=(9.6, 3.05 * nrow))
+    top = []
+    for i, name in enumerate(funcs):
+        fn = amg.make_function(name, seed=seed)
+        rng = np.random.default_rng(seed)
+        P = amg.sample_disk(N, rng=rng)
+        p0 = amg.karcher_mean(P)
+        res = amg.compute_amg(fn, p0, P)
+        show_emb = amg.subspace_distance(res.U_active, res.W) > EMBED_SHOW_TOL
+
+        ax0 = fig.add_subplot(nrow, 3, 3 * i + 1)
+        _draw_normal_coords(ax0, fn, res, R=R)
+        ax0.set_xticks([]); ax0.set_yticks([])
+        ax0.set_ylabel(PANEL_LABELS.get(name, name))
+
+        ax1 = fig.add_subplot(nrow, 3, 3 * i + 2, projection="3d")
+        _draw_sphere_3d(ax1, fn, res, show_embedding=show_emb, zoom=1.7)
+
+        ax2 = fig.add_subplot(nrow, 3, 3 * i + 3)
+        _draw_shadow(ax2, fn, res, show_embedding=show_emb)
+        ax2.set_xticks([]); ax2.set_yticks([])
+
+        if i == 0:
+            top = [ax0, ax1, ax2]
+
+    fig.tight_layout(h_pad=0.4, w_pad=0.4)
+    # column headers above the top row (fig.text avoids the 3-D title overlap)
+    for ax, head in zip(top, heads):
+        pos = ax.get_position()
+        fig.text(pos.x0 + pos.width / 2, pos.y1 + 0.004, head,
+                 ha="center", va="bottom", fontsize=FONT_SIZE)
     if path:
         fig.savefig(path, dpi=150, bbox_inches="tight"); plt.close(fig)
     return fig
@@ -452,12 +489,20 @@ def main():
     ap.add_argument("--no-convergence", action="store_true")
     ap.add_argument("--cmap", default="lapaz",
                     help="colormap: Crameri (lapaz, batlow, vik, davos, ...) or matplotlib")
+    ap.add_argument("--panel", action="store_true",
+                    help="render the full example gallery (all toy functions) and exit")
     args = ap.parse_args()
 
     global CMAP
     CMAP = get_cmap(args.cmap)
 
     os.makedirs(FIGDIR, exist_ok=True)
+
+    if args.panel:
+        figure_panel(seed=args.seed, path=os.path.join(FIGDIR, "00_panel.png"))
+        print(f"gallery panel written to {os.path.join(FIGDIR, '00_panel.png')}")
+        return
+
     rng = np.random.default_rng(args.seed)
 
     func = amg.make_function(args.func, seed=args.seed)
