@@ -70,11 +70,6 @@ def main():
              solid_capstyle="round", solid_joinstyle="round")
     axA.plot(x, y, color=GEO["mean"], lw=1.6)        # centerline gamma
     axA.add_patch(plt.Rectangle((0, 0), 1, 1, fill=False, ec="0.4", lw=1.2))
-    # a delta scale bar
-    axA.annotate("", xy=(0.985, (0.5) / n_pass), xytext=(0.985, (1.5) / n_pass),
-                 arrowprops=dict(arrowstyle="<->", color=GEO["mean"], lw=1.2))
-    axA.text(0.955, 1.0 / n_pass, r"$\delta$", color=GEO["mean"],
-             ha="right", va="center", fontsize=13)
     axA.text(0.5, -0.09, r"a $\delta$-tube covers $\mathcal{X}\subset\mathbb{R}^2$"
              + "\n" + r"$\Rightarrow$ reproduces any $f$",
              ha="center", va="top", fontsize=11, color="0.3")
