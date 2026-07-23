@@ -72,7 +72,7 @@ def _finish(ax, title):
     ax.set_axis_off()
     ax.view_init(elev=ELEV, azim=AZIM)
     ax.set_xlim(-LIM, LIM); ax.set_ylim(-LIM, LIM); ax.set_zlim(-LIM, LIM)
-    ax.text2D(0.5, 0.02, title, transform=ax.transAxes, ha="center", fontsize=15)
+    # panel titles intentionally omitted -- the slide's equations carry them
 
 
 def main():
@@ -110,7 +110,7 @@ def main():
 
     axL = fig.add_subplot(1, 2, 1, projection="3d")
     draw(axL, Wi, mag_i)
-    _finish(axL, r"intrinsic  $w_1(p)=\mathcal{P}^{-1}_p[w_1]$")
+    _finish(axL, None)
 
     axR = fig.add_subplot(1, 2, 2, projection="3d")
     draw(axR, Wp, mag_p)
@@ -120,9 +120,7 @@ def main():
         if d @ view > 0.02 and d[2] >= -1e-6:
             axR.scatter(*(d * 1.02), color="#D81159", marker="x", s=90,
                         linewidths=2.5, depthshade=False, zorder=10)
-    axR.text2D(0.5, 0.10, r"$\times=\pm\widehat{b}$ (field $=0$)",
-               transform=axR.transAxes, ha="center", fontsize=10, color="#D81159")
-    _finish(axR, r"projected  $\pi_{\widehat{x}}\,\widehat{b}$")
+    _finish(axR, None)
 
     sm = ScalarMappable(norm=norm, cmap=cmap); sm.set_array([])
     cax = fig.add_axes([0.42, 0.16, 0.16, 0.028])
