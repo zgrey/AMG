@@ -1,3 +1,6 @@
 __pycache__/
 *.pyc
 figs/*.png
+# generated animation frame sequences (regenerate via *_anim.py; the deck's
+# tracked copies live in preso-SST/img/)
+figs/*_anim/
