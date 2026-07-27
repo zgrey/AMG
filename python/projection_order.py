@@ -1,5 +1,5 @@
 """
-Dominant projection vs. projected dominance (ordering of projection), on S^2.
+Projected dominance vs. dominant projection (ordering of projection), on S^2.
 
 For the AMG-TREM ITL talk (preso-SST), supplemental slide.  On the ordered
 quadratic (non-ridge) f = x^T diag(1,2,3) x over S^2, the extrinsic operator
@@ -7,12 +7,18 @@ C_iota has two comparable ambient eigenvalues, so the cos^2(theta_i) reweighting
 of the tangential projection FLIPS the ordering.  The two candidate dominant
 tangent directions then separate by a visible angle:
 
-  dominant projection  pi_0[b_hat]         (decompose C_iota, THEN project)
-  projected dominance  top eig( E0^T C_iota E0 )   (project, THEN decompose)
+  projected dominance  pi_0[b_hat]         (decompose C_iota, THEN project)
+  dominant projection  top eig( E0^T C_iota E0 )   (project, THEN decompose)
+
+NOTE (2026-07-27): these two names were previously assigned the WRONG WAY ROUND
+here and in the talk legend.  The naming above is the canonical one, matching
+Remark 7 of the arXiv paper: the *dominant projection* is the leading
+eigenvector of the central block, and *projected dominance* is the ambient
+dominant eigenvector projected afterwards.  The math below never changed.
 
 Both are drawn as frame fields over a geodesic cap around p_0:
-  * dominant projection field  x_hat -> pi_{x_hat}[b_hat]        (rose)
-  * projected dominance field  p     -> P^{-1}_p[w_star]         (petrol, unit)
+  * projected dominance field  x_hat -> pi_{x_hat}[b_hat]        (rose)
+  * dominant projection field  p     -> P^{-1}_p[w_star]         (petrol, unit)
 with the angle phi between the two central directions annotated.
 
 See REMARK-eig-projection-noncommute.md (Applied_AMG) for the theory.
@@ -71,18 +77,18 @@ def main():
 
     res = amg.compute_amg(func, p0, P)
     C = res.Gt.T @ res.Gt / res.Gt.shape[0]        # ambient GOP C_iota (3x3)
-    # dominant projection: project the ambient-dominant eigenvector of C
+    # projected dominance: project the ambient-dominant eigenvector of C
     val, vec = np.linalg.eigh(C); o = np.argsort(val)[::-1]
     b_hat = vec[:, o[0]]
-    dp0 = res.W.copy()                              # = normalized pi_0[b_hat]
-    dp0 /= np.linalg.norm(dp0)
-    # projected dominance: top eigenvector of the projected block E^T C E
+    pi0_bhat = res.W.copy()                         # = normalized pi_0[b_hat]
+    pi0_bhat /= np.linalg.norm(pi0_bhat)
+    # dominant projection: top eigenvector of the projected block E^T C E
     B = E.T @ C @ E
     bv, bvec = np.linalg.eigh(B); bo = np.argsort(bv)[::-1]
     w_star = E @ bvec[:, bo[0]]; w_star /= np.linalg.norm(w_star)
-    if dp0 @ w_star < 0:                            # sign-align for display
+    if pi0_bhat @ w_star < 0:                       # sign-align for display
         w_star = -w_star
-    phi = np.degrees(np.arccos(np.clip(dp0 @ w_star, -1, 1)))
+    phi = np.degrees(np.arccos(np.clip(pi0_bhat @ w_star, -1, 1)))
     print("angle phi (deg) =", round(phi, 1),
           "| ambient eigvals:", np.round(val[o], 3))
 
@@ -107,13 +113,13 @@ def main():
         x = G[k]
         if np.linalg.norm(x - p0) < 0.12:                # keep a clear zone at p0
             continue
-        dp = (np.eye(3) - np.outer(x, x)) @ b_hat        # dominant projection field
-        if np.linalg.norm(dp) > 0.08:
-            d = dp / np.linalg.norm(dp)
+        pi_x_bhat = (np.eye(3) - np.outer(x, x)) @ b_hat  # projected dominance field
+        if np.linalg.norm(pi_x_bhat) > 0.08:
+            d = pi_x_bhat / np.linalg.norm(pi_x_bhat)
             ax.quiver(*x, *d, length=glen, normalize=False, color=ROSE,
                       lw=1.4, arrow_length_ratio=0.3, zorder=6)
-        pd = amg.parallel_transport(p0, x, w_star)       # projected dominance field
-        ax.quiver(*x, *pd, length=glen, normalize=False, color=PETROL,
+        w_star_x = amg.parallel_transport(p0, x, w_star)  # dominant projection field
+        ax.quiver(*x, *w_star_x, length=glen, normalize=False, color=PETROL,
                   lw=1.4, arrow_length_ratio=0.3, zorder=5, alpha=0.9)
 
     # base point marker only (no central dominant vectors, no angle overlay)
@@ -123,9 +129,9 @@ def main():
     from matplotlib.lines import Line2D
     ax.legend(handles=[
         Line2D([0], [0], color=ROSE, lw=3,
-               label=r"dominant projection  $\pi_0\widehat{b}$  (decompose $\to$ project)"),
+               label=r"projected dominance  $\pi_0\widehat{b}$  (decompose $\to$ project)"),
         Line2D([0], [0], color=PETROL, lw=3,
-               label=r"projected dominance  (project $\to$ decompose)")],
+               label=r"dominant projection  (project $\to$ decompose)")],
         loc="lower center", frameon=False, fontsize=9.5, bbox_to_anchor=(0.5, -0.02))
 
     ax.set_box_aspect((1, 1, 1)); ax.set_axis_off()
