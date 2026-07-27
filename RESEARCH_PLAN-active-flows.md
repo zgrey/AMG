@@ -4,7 +4,12 @@
 Riemannian Manifolds* (name continues the lineage: active subspaces → active
 manifold-geodesics → active flows).
 
-**Status:** plan drafted 2026-07-25 from the `python/integral_curves.ipynb` experiments
+**Status:** ⚠️ **The canonical, maintained plan now lives in the Overleaf project**
+(`~/Git/GitHub/Overleaf/Active_Flows/RESEARCH_PLAN.md`), alongside `LITERATURE.md`,
+`OUTLINE.md`, and `active_flows.bib`. This copy is the code-side snapshot as of 2026-07-25 and
+is no longer updated — read it for context, edit the Overleaf copy.
+
+Plan drafted 2026-07-25 from the `python/integral_curves.ipynb` experiments
 (this repo). To be broken out into its own Overleaf doc/repo (Phase 0); this file then
 seeds that project's `RESEARCH_NOTES.md`. Code home stays **this repo** (AMG), venv
 `tda-sst`, per the workspace convention (Overleaf repos are documents, never code).
