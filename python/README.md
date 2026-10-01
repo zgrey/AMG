@@ -38,6 +38,13 @@ Uses the `tda-sst` venv (numpy / scipy / matplotlib + evie):
 ~/venvs/tda-sst/Scripts/python sphere_amg_demo.py --func linear_random
 ```
 
+The ridge-recovery study is written twice: `05_ridge_recovery_<func>.png` (the absolute RMS
+deviation from the active-geodesic profile, as in the v1 paper) and `05_ridge_recovery_rel_<func>.png`
+(three panels: the same shadow; the deviation next to the spread of f over the ball; and their ratio,
+the *relative* deviation, on a common axis). Only the ratio separates a locally one-dimensional response
+from a genuinely two-dimensional one, because every C² response has an O(R²) absolute deviation.
+`--ridge-only` renders just these two figures.
+
 Options: `--func {linear_random, linear_aligned, quadratic_pref,
 quadratic_ridge, nonlinear_ridge, nonlinear_nonridge}`, `--cmap
 {lapaz, batlow, vik, ...}` (Crameri via `cmcrameri`, or any matplotlib map),

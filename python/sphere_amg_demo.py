@@ -423,6 +423,34 @@ def figure_ridge_recovery(func, res, R_max=1.0, npts=9000, seed=1, path=None):
     sweep as a function of R -- the convergence, curvature-limited as R -> 0.
     A genuine 2-D (non-ridge) function keeps a vertical spread / a nonzero RMS
     plateau even at small R."""
+    S = _ridge_samples(func, res, R_max, npts, seed)
+
+    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.4, 4.7))
+    _draw_ridge_shadow(axL, func, S, R_max)
+
+    # --- right: RMS deviation from the active-geodesic sweep vs ball radius ---
+    Rgrid, rms, _ = _ridge_rms(func, S, R_max)
+    axR.loglog(Rgrid, np.clip(rms, 1e-16, None), "o-", color="k", lw=2, ms=6, zorder=1)
+    good = np.isfinite(rms) & (rms > 1e-13)
+    if good.sum() >= 2:
+        c = np.polyfit(np.log10(Rgrid[good]), np.log10(rms[good]), 1)
+        axR.loglog(Rgrid, 10 ** c[1] * Rgrid ** c[0], "--", color=GEO["active"], lw=3)
+        axR.text(0.05, 0.92, fr"$\propto R^{{{c[0]:.1f}}}$", transform=axR.transAxes,
+                 color=GEO["active"], fontsize=FONT_SIZE - 1, va="top")
+    axR.set_xlabel(r"geodesic-ball radius  $R$")
+    axR.set_ylabel(r"RMS deviation from active geodesic")
+    axR.grid(True, which="both", alpha=0.3)
+
+    fig.tight_layout()
+    if path:
+        fig.savefig(path, dpi=150, bbox_inches="tight"); plt.close(fig)
+    return fig
+
+
+def _ridge_samples(func, res, R_max, npts, seed):
+    """Uniform-in-area samples of the tangent disk of radius R_max (normal
+    coordinates), with their active coordinate s1 and function values.  Shared by
+    the absolute and relative ridge-recovery figures so both use identical data."""
     p0, E = res.p0, res.E
     u1 = res.U_active
     u2 = res.U_inactive
@@ -434,10 +462,26 @@ def figure_ridge_recovery(func, res, R_max=1.0, npts=9000, seed=1, path=None):
     tnml = np.column_stack([rr * np.cos(th), rr * np.sin(th)])
     s1 = tnml @ w1                                   # active geodesic coordinate
     fval = func.f(_normal_to_sphere(p0, E, tnml))
+    return dict(p0=p0, E=E, u1=u1, u2=u2, rr=rr, s1=s1, fval=fval)
 
-    fig, (axL, axR) = plt.subplots(1, 2, figsize=(11.4, 4.7))
 
-    # --- left: shadow over nested shrinking balls ---
+def _ridge_rms(func, S, R_max, nR=16):
+    """For each ball radius R on a grid: the RMS deviation of the samples from the
+    active-geodesic profile f(exp(s1 u1)), and the spread (standard deviation) of f
+    over the same ball."""
+    f_on_curve = func.f(amg.sphere_exp_batch(S["p0"], S["s1"][:, None] * S["u1"][None, :]))
+    dev = S["fval"] - f_on_curve
+    rr, fval = S["rr"], S["fval"]
+    Rgrid = np.linspace(0.1, R_max, nR)
+    rms = np.array([np.sqrt(np.mean(dev[rr <= R] ** 2)) if np.any(rr <= R) else np.nan
+                    for R in Rgrid])
+    spread = np.array([np.std(fval[rr <= R]) if np.any(rr <= R) else np.nan for R in Rgrid])
+    return Rgrid, rms, spread
+
+
+def _draw_ridge_shadow(axL, func, S, R_max):
+    """Left panel of the ridge-recovery figures: the shadow over nested balls."""
+    p0, u1, u2, rr, s1, fval = S["p0"], S["u1"], S["u2"], S["rr"], S["s1"], S["fval"]
     Rs = [1.0, 0.6, 0.3, 0.15]                       # nested, decreasing
     greys = [0.80, 0.55, 0.35, 0.0]                 # light (large R) -> dark (small R)
     ytop = np.nanmin(fval)+0.75
@@ -459,27 +503,63 @@ def figure_ridge_recovery(func, res, R_max=1.0, npts=9000, seed=1, path=None):
     axL.set_ylabel(r"$f\circ\exp_{p_0}$")
     axL.set_xlim(-1.15 * R_max, 1.15 * R_max)
 
-    # --- right: RMS deviation from the active-geodesic sweep vs ball radius ---
-    f_on_curve = func.f(amg.sphere_exp_batch(p0, s1[:, None] * u1[None, :]))
-    dev = fval - f_on_curve
-    Rgrid = np.linspace(0.1, R_max, 16)
-    rms = np.array([np.sqrt(np.mean(dev[rr <= R] ** 2)) if np.any(rr <= R) else np.nan
-                    for R in Rgrid])
-    axR.loglog(Rgrid, np.clip(rms, 1e-16, None), "o-", color="k", lw=2, ms=6, zorder=1)
-    good = np.isfinite(rms) & (rms > 1e-13)
-    if good.sum() >= 2:
-        c = np.polyfit(np.log10(Rgrid[good]), np.log10(rms[good]), 1)
-        axR.loglog(Rgrid, 10 ** c[1] * Rgrid ** c[0], "--", color=GEO["active"], lw=3)
-        axR.text(0.05, 0.92, fr"$\propto R^{{{c[0]:.1f}}}$", transform=axR.transAxes,
-                 color=GEO["active"], fontsize=FONT_SIZE - 1, va="top")
+
+def _loglog_fit(ax, R, y, color, label, ypos, ls="--"):
+    """Log-log fit of y(R); draws the fitted power law and annotates its exponent."""
+    good = np.isfinite(y) & (y > 1e-13)
+    if good.sum() < 2:
+        return np.nan
+    c = np.polyfit(np.log10(R[good]), np.log10(y[good]), 1)
+    ax.loglog(R, 10 ** c[1] * R ** c[0], ls, color=color, lw=2.5, alpha=0.85)
+    ax.text(0.04, ypos, fr"{label} $\propto R^{{{c[0]:.1f}}}$", transform=ax.transAxes,
+            color=color, fontsize=FONT_SIZE - 2, va="top", zorder=10,
+            bbox=dict(facecolor="white", edgecolor="none", alpha=0.85, pad=1.5))
+    return c[0]
+
+
+def figure_ridge_recovery_rel(func, res, R_max=1.0, npts=9000, seed=1, path=None):
+    """Relative ridge recovery over a shrinking geodesic ball (three panels).
+
+    Left: the same shadow as ``figure_ridge_recovery`` (identical samples).
+    Middle: two curves against R -- the RMS deviation of the samples from the
+    active-geodesic profile (black, the quantity of the original right panel) and
+    the spread of f over the same ball, std_R(f) (petrol).  Right: their ratio,
+    the *relative* deviation.  Any C^2 response with a nonvanishing gradient at
+    p0 has an absolute deviation of order R^2; the ratio separates a response that
+    is locally one-dimensional (ratio -> 0) from a genuinely two-dimensional one
+    (ratio stays of order one), e.g. at a critical point where std_R(f) is itself
+    of order R^2."""
+    S = _ridge_samples(func, res, R_max, npts, seed)
+    Rgrid, rms, spread = _ridge_rms(func, S, R_max)
+    rel = rms / spread
+
+    fig, (axL, axM, axR) = plt.subplots(1, 3, figsize=(16.6, 4.7))
+    _draw_ridge_shadow(axL, func, S, R_max)
+
+    # --- middle: absolute deviation next to the spread of f over the ball ---
+    axM.loglog(Rgrid, np.clip(spread, 1e-16, None), "s-", color=GEO["mean"], lw=2, ms=5,
+               label=r"spread of $f$ over the ball")
+    axM.loglog(Rgrid, np.clip(rms, 1e-16, None), "o-", color="k", lw=2, ms=5,
+               label="RMS deviation from AMG profile")
+    _loglog_fit(axM, Rgrid, spread, GEO["mean"], "spread", 0.97, ls=":")
+    _loglog_fit(axM, Rgrid, rms, GEO["active"], "deviation", 0.87)
+    axM.set_xlabel(r"geodesic-ball radius  $R$")
+    axM.set_ylabel("absolute (units of $f$)")
+    axM.legend(loc="lower right", fontsize=FONT_SIZE - 4, framealpha=0.9)
+    axM.grid(True, which="both", alpha=0.3)
+
+    # --- right: the ratio ---
+    axR.loglog(Rgrid, np.clip(rel, 1e-16, None), "o-", color="k", lw=2, ms=6)
+    _loglog_fit(axR, Rgrid, rel, GEO["active"], "ratio", 0.97)
+    axR.set_ylim(1e-3, 3)        # common range across functions, so panels compare at a glance
     axR.set_xlabel(r"geodesic-ball radius  $R$")
-    axR.set_ylabel(r"RMS deviation from active geodesic")
+    axR.set_ylabel("relative deviation\n(deviation / spread)")
     axR.grid(True, which="both", alpha=0.3)
 
     fig.tight_layout()
     if path:
         fig.savefig(path, dpi=150, bbox_inches="tight"); plt.close(fig)
-    return fig
+    return fig, dict(R=Rgrid, rms=rms, spread=spread, rel=rel)
 
 
 # --------------------------------------------------------------------------- #
@@ -495,6 +575,8 @@ def main():
                     help="colormap: Crameri (lapaz, batlow, vik, davos, ...) or matplotlib")
     ap.add_argument("--panel", action="store_true",
                     help="render the full example gallery (all toy functions) and exit")
+    ap.add_argument("--ridge-only", action="store_true",
+                    help="render only the ridge-recovery figures (absolute and relative)")
     args = ap.parse_args()
 
     global CMAP
@@ -522,6 +604,16 @@ def main():
     print(f"embedding W         : {np.round(res.W, 4)}")
 
     tag = func.name
+    if args.ridge_only:
+        figure_ridge_recovery(
+            func, res, path=os.path.join(FIGDIR, f"05_ridge_recovery_{tag}.png"))
+        _, d = figure_ridge_recovery_rel(
+            func, res, path=os.path.join(FIGDIR, f"05_ridge_recovery_rel_{tag}.png"))
+        for R, a, s, q in zip(d["R"][[0, 5, 10, 15]], d["rms"][[0, 5, 10, 15]],
+                              d["spread"][[0, 5, 10, 15]], d["rel"][[0, 5, 10, 15]]):
+            print(f"  R={R:5.2f}  deviation={a:9.3e}  spread={s:9.3e}  relative={q:9.3e}")
+        print(f"figures written to  : {FIGDIR}")
+        return
     d_uw = amg.subspace_distance(res.U_active, res.W)
     show_emb = d_uw > EMBED_SHOW_TOL   # hide the coincident embedding trace
     print(f"d(U1, W)            : {d_uw:.4f}  -> embedding trace "
@@ -533,6 +625,8 @@ def main():
                   path=os.path.join(FIGDIR, f"03_shadow_{tag}.png"))
     figure_ridge_recovery(
         func, res, path=os.path.join(FIGDIR, f"05_ridge_recovery_{tag}.png"))
+    figure_ridge_recovery_rel(
+        func, res, path=os.path.join(FIGDIR, f"05_ridge_recovery_rel_{tag}.png"))
     # Convergence needs a non-degenerate reference: the ridge direction must
     # have a non-vanishing tangential component at p0 (the aligned case is
     # normal at the pole -> skip it, and say so).
