@@ -23,6 +23,13 @@ machine precision within the injectivity radius (angle < π/2).
   inactive/embedding geodesics), shadow plot, convergence, and the
   ridge-recovery demonstration.
 
+- **`verify_local_agreement.py`** — numerical verification behind the arXiv v2 revision of
+  Prop. 3 (local agreement) and the new manifold ridge bound: deterministic tangent-ball
+  quadrature (closed-form sphere and cylinder geometry; no EVIE), checking the κ² agreement bound
+  and trace identity, the trailing-spectrum / r ≥ 2 rates for symmetric versus skewed densities,
+  the Jacobi-field comparison, and the conditional-mean ridge bound. Prints tables; exits with
+  "All inequality checks PASSED" when every proved inequality holds.
+
 ## Run
 
 Uses the `tda-sst` venv (numpy / scipy / matplotlib + evie):
