@@ -30,6 +30,12 @@ machine precision within the injectivity radius (angle < π/2).
   the Jacobi-field comparison, and the conditional-mean ridge bound. Prints tables; exits with
   "All inequality checks PASSED" when every proved inequality holds.
 
+- **`check_noncritical_nonridge.py`** — supports the v1.5 Fig. 6 caption. Using the figure
+  pipeline itself, it tests whether a non-ridge with no critical point near the centre can show
+  O(R²) decay *and* persistent scatter. It cannot: the two together need a (near-)critical point
+  within the plotted ball. The script prints slope and relative-deviation tables for tilted
+  quadratics, with the AMG direction both fixed from the hemisphere and recomputed per ball.
+
 ## Run
 
 Uses the `tda-sst` venv (numpy / scipy / matplotlib + evie):
